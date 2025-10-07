@@ -1,0 +1,26 @@
+name: SignInPlus
+main: cc.vastsea.SignInPlus
+version: ${version}
+api: paper
+api-version: '1.20'
+authors:
+  - zrll_
+  - Snowball_233
+description: 现代化的多功能签到插件
+depend:
+  - PlaceholderAPI
+commands:
+  signinplus:
+    aliases: [sip, signin, checkin, qd, qiandao]
+    description: 签到插件主命令
+    usage: /signinplus help
+permissions:
+  signinplus.user:
+    description: 可以签到（玩家默认权限）
+    default: true
+  signinplus.make_up:
+    description: 可以补签（玩家默认权限）
+    default: true
+  signinplus.admin:
+    description: 管理签到系统（强制默认签到、补签、reload）
+    default: op
