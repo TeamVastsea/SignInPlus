@@ -10,6 +10,7 @@ import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
+import java.time.LocalDate
 import kotlin.random.Random
 
 class RewardExecutor(private val plugin: SignInPlus) {
@@ -19,13 +20,18 @@ class RewardExecutor(private val plugin: SignInPlus) {
         // 默认奖励
         runActionsFromConfig("default.actions", playerName)
 
-        // 累计奖励（列表结构：第一个元素可为 enable，后续为 { times, actions }）
-        val total = plugin.storage.getTotalDays(playerName)
-        runCumulativeRewards(total, playerName)
+        if (plugin.storage is SqliteStorage) {
+            val s = plugin.storage as SqliteStorage
+            val signedDates = s.getSignedDates(playerName)
 
-        // 连续奖励（列表结构：第一个元素可为 enable，后续为 { times, actions }）
-        val streak = plugin.storage.getStreakDays(playerName)
-        runStreakRewards(streak, playerName)
+            // 累计奖励
+            val total = signedDates.size
+            runCumulativeRewards(total, playerName)
+
+            // 连续奖励
+            val streak = checkStreak(signedDates)
+            runStreakRewards(streak, playerName)
+        }
 
         // 排行奖励（列表结构：第一个元素可为 enable，后续为 { rank, actions }）
         val rankStr = if (plugin.storage is SqliteStorage) (plugin.storage as SqliteStorage).getRankToday(playerName) else plugin.storage.getInfo(playerName).rankToday
@@ -77,6 +83,23 @@ class RewardExecutor(private val plugin: SignInPlus) {
             runActionLines(actions, playerName)
             plugin.storage.markClaimedTotalReward(playerName, threshold)
         }
+    }
+
+    private fun checkStreak(dates: List<LocalDate>): Int {
+        val today = LocalDate.now(java.time.ZoneId.of(plugin.config.getString("timezone") ?: "Asia/Shanghai"))
+        var streak = 0
+        var currentDate = today
+
+        // 如果今天还没签到，就从昨天开始算
+        if (!dates.contains(today)) {
+            currentDate = today.minusDays(1)
+        }
+
+        while (dates.contains(currentDate)) {
+            streak++
+            currentDate = currentDate.minusDays(1)
+        }
+        return streak
     }
 
     private fun runStreakRewards(streakDays: Int, playerName: String) {

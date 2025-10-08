@@ -49,8 +49,21 @@ class SqliteStorage(dbPath: String, timezone: String) : Storage {
                 );
                 """.trimIndent()
             )
+            st.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS plugin_meta (
+                  key TEXT PRIMARY KEY,
+                  value TEXT NOT NULL
+                );
+                """.trimIndent()
+            )
             st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_checkins_player_day ON checkins(player, day);")
             st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_checkins_day_time ON checkins(day, time);")
+        }
+        conn.prepareStatement("INSERT OR IGNORE INTO plugin_meta(key, value) VALUES(?, ?)").use { ps ->
+            ps.setString(1, "first_launch_date")
+            ps.setString(2, LocalDate.now(zoneId).toString())
+            ps.executeUpdate()
         }
     }
 
@@ -73,30 +86,78 @@ class SqliteStorage(dbPath: String, timezone: String) : Storage {
         }
     }
 
-    fun makeUpDays(player: String, days: Int) {
-        if (days <= 0) return
-        val start = LocalDate.now(zoneId).minusDays(1)
-        var d = start
-        var remaining = days
-        while (remaining > 0) {
-            val day = d.toString()
-            conn.prepareStatement("SELECT 1 FROM checkins WHERE player=? AND day=? LIMIT 1").use { ps ->
-                ps.setString(1, player)
-                ps.setString(2, day)
-                ps.executeQuery().use { rs ->
-                    if (!rs.next()) {
-                        conn.prepareStatement("INSERT INTO checkins(player, day, time) VALUES(?,?,?)").use { ips ->
-                            ips.setString(1, player)
-                            ips.setString(2, day)
-                            ips.setLong(3, System.currentTimeMillis())
-                            ips.executeUpdate()
-                        }
-                        remaining -= 1
-                    }
-                }
-            }
-            d = d.minusDays(1)
+    override fun makeUpSign(player: String, cards: Int, force: Boolean): Pair<List<LocalDate>, Int> {
+        val today = LocalDate.now(zoneId)
+        val isSignedInToday = isSignedIn(player)
+        val missedDaysCount = getMissedDays(player)
+
+        if (!isSignedInToday && missedDaysCount == 0) {
+            signInToday(player)
+            return Pair(listOf(today), cards)
         }
+
+        val firstLaunchDateStr = conn.prepareStatement("SELECT value FROM plugin_meta WHERE key = 'first_launch_date'").use { ps ->
+            ps.executeQuery().use { rs -> if (rs.next()) rs.getString(1) else LocalDate.now(zoneId).toString() }
+        }
+        val firstLaunchDate = LocalDate.parse(firstLaunchDateStr)
+
+        val signedDays = mutableSetOf<String>()
+        conn.prepareStatement("SELECT day FROM checkins WHERE player=?").use { ps ->
+            ps.setString(1, player)
+            ps.executeQuery().use { rs -> while (rs.next()) signedDays.add(rs.getString(1)) }
+        }
+
+        val missedDays = mutableListOf<LocalDate>()
+        var currentDate = today.minusDays(1)
+        while (!currentDate.isBefore(firstLaunchDate)) {
+            if (!signedDays.contains(currentDate.toString())) {
+                missedDays.add(currentDate)
+            }
+            currentDate = currentDate.minusDays(1)
+        }
+
+        if (missedDays.isEmpty()) {
+            if (!isSignedInToday) {
+                signInToday(player)
+                return Pair(listOf(today), cards)
+            }
+            return Pair(emptyList(), cards) // No days to make up, return all cards
+        }
+
+        val slipsToUse = if (force) cards.coerceAtMost(missedDays.size) else getCorrectionSlipAmount(player).coerceAtMost(cards).coerceAtMost(missedDays.size)
+        if (!force) {
+            decreaseCorrectionSlip(player, slipsToUse)
+        }
+        val daysToSign = missedDays.take(slipsToUse)
+        
+        conn.autoCommit = false
+        try {
+            conn.prepareStatement("INSERT INTO checkins(player, day, time) VALUES(?,?,?)").use { ps ->
+                for (day in daysToSign) {
+                    ps.setString(1, player)
+                    ps.setString(2, day.toString())
+                    ps.setLong(3, System.currentTimeMillis())
+                    ps.addBatch()
+                }
+                ps.executeBatch()
+            }
+            conn.commit()
+        } catch (e: Exception) {
+            conn.rollback()
+            throw e // Re-throw the exception after rollback
+        } finally {
+            conn.autoCommit = true
+        }
+
+        val refundedCards = cards - slipsToUse
+        
+        val madeUpDays = daysToSign.toMutableList()
+        if (!isSignedInToday) {
+            signInToday(player)
+            madeUpDays.add(today)
+        }
+
+        return Pair(madeUpDays, refundedCards)
     }
 
     override fun isSignedIn(player: String): Boolean {
@@ -222,8 +283,7 @@ class SqliteStorage(dbPath: String, timezone: String) : Storage {
             lastCheckInTime = getLastCheckInTime(player),
             rankToday = getRankToday(player),
             points = getPoints(player),
-            signedInToday = isSignedIn(player),
-            correctionSlipAmount = getCorrectionSlipAmount(player),
+            correctionSlipAmount = getCorrectionSlipAmount(player)
         )
     }
 
@@ -292,5 +352,49 @@ class SqliteStorage(dbPath: String, timezone: String) : Storage {
         }
         val ranked = players.map { it to getStreakDays(it) }.sortedByDescending { it.second }.take(limit)
         return ranked
+    }
+
+    private fun getFirstLaunchDate(player: String): LocalDate? {
+        val sql = "SELECT value FROM plugin_meta WHERE key = 'first_launch_date'"
+        conn.prepareStatement(sql).use { pstmt ->
+            pstmt.executeQuery().use { rs ->
+                if (rs.next()) {
+                    return LocalDate.parse(rs.getString("value"))
+                }
+            }
+        }
+        return null
+    }
+
+    override fun getSignedDates(player: String): List<LocalDate> {
+        val dates = mutableListOf<LocalDate>()
+        val sql = "SELECT day FROM checkins WHERE player = ? ORDER BY day ASC"
+        conn.prepareStatement(sql).use { pstmt ->
+            pstmt.setString(1, player)
+            pstmt.executeQuery().use { rs ->
+                while (rs.next()) {
+                    dates.add(LocalDate.parse(rs.getString("day")))
+                }
+            }
+        }
+        return dates
+    }
+
+    override fun getMissedDays(player: String): Int {
+        val firstDay = getFirstLaunchDate(player) ?: return 0
+        val signedDates = getSignedDates(player).toSet()
+        if (firstDay !in signedDates) return 0 // Not even signed once
+
+        var missed = 0
+        var currentDate = firstDay
+        val today = LocalDate.now(zoneId)
+
+        while (currentDate.isBefore(today)) {
+            if (currentDate !in signedDates) {
+                missed++
+            }
+            currentDate = currentDate.plusDays(1)
+        }
+        return missed
     }
 }

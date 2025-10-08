@@ -28,8 +28,7 @@ class SignInPlusExpansion(private val plugin: SignInPlus) : PlaceholderExpansion
 
         // 状态占位符（无后缀时默认当前玩家）
         matchWithOptionalName("check_in_status")?.let { target ->
-            val p = plugin.storage.getInfo(target)
-            return if (p.signedInToday) "&a已签到" else "&c未签到"
+            return if (plugin.storage.isSignedIn(target)) "&a已签到" else "&c未签到"
         }
 
         // 支持带玩家名的占位符：total_days / streak_days / correction_slip_amount / last_check_in时间 / rank_today / points
