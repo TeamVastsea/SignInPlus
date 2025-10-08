@@ -261,16 +261,28 @@ class RewardExecutor(private val plugin: SignInPlus) {
             }
             action.startsWith("[ITEM]") -> {
                 val spec = action.substringAfter("[ITEM]").trim()
-                val parts = spec.split(" ", limit = 3)
+                val parts = spec.split(" ")
                 var itemKey = parts.getOrNull(0) ?: return
-                val amount = (parts.getOrNull(1)?.toIntOrNull() ?: 1).coerceAtLeast(1)
-                val nbt = parts.getOrNull(2)
+                val amount = parts.getOrNull(1)?.toIntOrNull() ?: 1
+                val nbtAndFlags = if (parts.size > 2) parts.drop(2).joinToString(" ") else null
+
+                var nbt: String? = nbtAndFlags
+                var force = false
+                if (nbt != null) {
+                    val forceRegex = Regex("\\s+force=true$", RegexOption.IGNORE_CASE)
+                    if (forceRegex.containsMatchIn(nbt)) {
+                        force = true
+                        nbt = forceRegex.replace(nbt, "")
+                    }
+                }
+
+                val cleanNbt = nbt?.trim()?.removeSurrounding("\"")
 
                 if (itemKey.contains(":")) itemKey = itemKey.substringAfter(":")
                 val mat = Material.matchMaterial(itemKey.uppercase()) ?: return
                 val stack = ItemStack(mat, amount)
-                if (!nbt.isNullOrBlank()) {
-                    runCatching { Bukkit.getUnsafe().modifyItemStack(stack, nbt) }.getOrNull()
+                if (!cleanNbt.isNullOrBlank()) {
+                    applyNbtSafely(stack, cleanNbt, force, player)
                 }
                 player?.inventory?.addItem(stack)
             }
@@ -291,8 +303,24 @@ class RewardExecutor(private val plugin: SignInPlus) {
         }
     }
 
+    private fun applyNbtSafely(stack: ItemStack, nbt: String, force: Boolean, player: Player?) {
+        var processedNbt = nbt.trim()
+        if (force) {
+            // Strip existing braces and wrap with a new pair to ensure it's a valid object.
+            processedNbt = "{${processedNbt.removeSurrounding("{", "}").trim()}}"
+        }
+
+        runCatching {
+            Bukkit.getUnsafe().modifyItemStack(stack, processedNbt)
+        }.onFailure { e ->
+            val errorMessage = prefix + "Failed to parse item NBT: ${e.cause?.message ?: e.message}"
+            player?.sendMessage(errorMessage)
+            plugin.logger.warning("NBT parse error for '$nbt' (processed as '$processedNbt'): ${e.message}")
+        }
+    }
+
     private fun parsePointsValue(spec: String): Double {
-        // 支持："10" | "1..5" | "1..5 z" | "1..5 .2f"
+        // 支持： "10" | "1..5" | "1..5 z" | "1..5 .2f"
         val parts = spec.split(" ")
         val range = parts.getOrNull(0) ?: "0"
         val fmt = parts.getOrNull(1)

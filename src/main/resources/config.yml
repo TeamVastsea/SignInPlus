@@ -41,47 +41,64 @@ storage:
 # - [/RANDOM_PICK] 结束随机互斥抽取列表块 
 ######################################################### 
 default: 
-  actions: 
-    # 默认用法 
-    - "[COMMAND] give %player_name% apple 64" 
-    - "[SOUND] ENTITY_PLAYER_LEVELUP 0.5 1.0" 
-    - "[ITEM] apple 64" 
-    - '[ITEM] diamond_sword 1 {"enchantments": {"minecraft:unbreaking": {"level": 1}}}' 
-    - "[SLEEP] 20" 
-    - "[EFFECT] speed 2 10" 
-    - "[POINTS] 64" # 64积分 
-    - "[POINTS] 64 z" # 64积分 
-    - "[POINTS] 1..5 .2f" # 1<= x <= 5 保留两位小数 e.g. 1.23 
-    - "[POINTS] 1..5 .1f" # 1<= x <= 5 保留一位小数 e.g. 1.2 
-    - "[POINTS] 1..5 .3f" # 1<= x <= 5 最多保留两位小数 e.g. 1.23 
-    - "[POINTS] 1..5 z" # 1<= x <= 5 整数 e.g. 2 
+  actions:
+    # 默认用法
+    - "[COMMAND] give %player_name% apple 64"
+    - "[SOUND] ENTITY_PLAYER_LEVELUP 0.5 1.0"
+    - "[ITEM] apple 64"
+    - "[BROADCAST] %player_name% &6累计签到100天，获得传说奖励！"
+    - "[TITLE] &c签到成功！"
+    - "[SLEEP] 20"
+    - "[EFFECT] speed 2 10"
+    
+    # 物品NBT
+    # 1. ✅ 正常附魔: 给予一把附魔了“耐久 III”的钻石剑
+    - '[ITEM] DIAMOND_SWORD 1 {Enchantments:[{id:"minecraft:unbreaking",lvl:3s}]}'
+    # 2. ✅ 复杂 NBT (自定义名称和 Lore): 给予一个名为“生命金苹果”并带有描述的特殊金苹果
+    - '[ITEM] GOLDEN_APPLE 1 {"display":{"Name":"{\"text\":\"生命金苹果\",\"color\":\"gold\",\"italic\":false}","Lore":["{\"text\":\"一个特殊的苹果！\",\"color\":\"yellow\"}"]}}'
+    # 3. ✅ 复杂 NBT (书): 给予一本有标题、作者和内容的成书
+    - '[ITEM] WRITTEN_BOOK 1 {title:"我的故事",author:"史蒂夫",pages:["{\"text\":\"第一页的内容。\"}","{\"text\":\"第二页更加精彩！\"}"]}'
+    # 4. ⚠️ 非法 NBT: 尝试给予一个带有错误 NBT 的石头。预期结果：玩家收到一个普通的石头，并在聊天框收到“物品NBT解析失败”的提示。
+    - "[ITEM] STONE 1 {invalid_nbt:true"
+    # 5. ⚠️ 强制模式修复: 给予一个 NBT 缺少了首尾大括号的铁锭。预期结果：通过 force=true 自动修复，玩家成功收到名为“强制修复的铁锭”的物品。
+    - '[ITEM] IRON_INGOT 1 "display":{"Name":"{\"text\":\"强制修复的铁锭\"}"} force=true'
+    # 6. ✅ 空 NBT: 给予一个带有空 NBT 的泥土。预期结果：玩家收到一个普通的泥土。
+    - "[ITEM] DIRT 1 {}"
 
-    # 概率奖励 
-    - "[PROB=0.25] [COMMAND] give %player_name% diamond 1" #25% 概率执行 
+    # 签到积分奖励
+    - "[POINTS] 64" # 64积分
+    - "[POINTS] 64 z" # 64积分
+    - "[POINTS] 1..5 .2f" # 1<= x <= 5 保留两位小数 e.g. 1.23
+    - "[POINTS] 1..5 .1f" # 1<= x <= 5 保留一位小数 e.g. 1.2
+    - "[POINTS] 1..5 .3f" # 1<= x <= 5 最多保留两位小数 e.g. 1.23
+    - "[POINTS] 1..5 z" # 1<= x <= 5 整数 e.g. 2
 
-    # 互斥奖励 
-    - "[RANDOM_PICK=2]" # 从 3 个奖励里 随机抽取 2 个不同的。 
-    - "[COMMAND] give %player_name% apple 10" 
-    - "[COMMAND] give %player_name% diamond 1" 
-    - "[COMMAND] give %player_name% emerald 5" 
-    - "[/RANDOM_PICK]" 
+    # 概率奖励
+    - "[PROB=0.25] [COMMAND] give %player_name% diamond 1" #25% 概率执行
 
-    # 权重奖励 
-    - "[RANDOM_WEIGHTED]" 
-    - "[WEIGHT=60] [COMMAND] give %player_name% apple 10" 
-    - "[WEIGHT=30] [COMMAND] give %player_name% diamond 1" 
-    - "[WEIGHT=10] [COMMAND] give %player_name% nether_star 1" 
-    - "[/RANDOM_WEIGHTED]" 
+    # 互斥奖励
+    - "[RANDOM_PICK=2]" # 从 3 个奖励里 随机抽取 2 个不同的。
+    - "[COMMAND] give %player_name% apple 10"
+    - "[COMMAND] give %player_name% diamond 1"
+    - "[COMMAND] give %player_name% emerald 5"
+    - "[/RANDOM_PICK]"
 
-    # # 嵌套用法 
-    - "[PROB=0.5] [COMMAND] give %player_name% bread 1" 
-    - "[RANDOM_WEIGHTED]" 
-    - "[WEIGHT=80] [COMMAND] give %player_name% apple 5" 
-    - "[WEIGHT=15] [COMMAND] give %player_name% diamond 1" 
-    - "[WEIGHT=5] [COMMAND] give %player_name% netherite_ingot 1" 
-    - "[/RANDOM_WEIGHTED]" 
-    - "[SLEEP] 20" 
-    - "[MESSAGE] 恭喜你完成签到！" 
+    # 权重奖励
+    - "[RANDOM_WEIGHTED]"
+    - "[WEIGHT=60] [COMMAND] give %player_name% apple 10"
+    - "[WEIGHT=30] [COMMAND] give %player_name% diamond 1"
+    - "[WEIGHT=10] [COMMAND] give %player_name% nether_star 1"
+    - "[/RANDOM_WEIGHTED]"
+
+    # # 嵌套用法
+    - "[PROB=0.5] [COMMAND] give %player_name% bread 1"
+    - "[RANDOM_WEIGHTED]"
+    - "[WEIGHT=80] [COMMAND] give %player_name% apple 5"
+    - "[WEIGHT=15] [COMMAND] give %player_name% diamond 1"
+    - "[WEIGHT=5] [COMMAND] give %player_name% netherite_ingot 1"
+    - "[/RANDOM_WEIGHTED]"
+    - "[SLEEP] 20"
+    - "[MESSAGE] 恭喜你完成签到！"
 
 ######################################################### 
 # 累计签到、连续奖励 
@@ -178,12 +195,16 @@ web_api:
 auto_check_in_on_login: 
   enable: false 
 
-######################################################### 
-# 插件基础配置 
-# TimeZone: ` `https://www.zeitverschiebung.net/cn/all-time-zones.html` ` 
-######################################################### 
-message_prefix: "&7[&a签到Plus&7] " # 插件消息前缀 
-language: zh_CN # 多语言 (zh_CN / en_US) 
-debug: false # 是否启用调试模式 (输出更多日志) 
-timezone: "Asia/Shanghai" 
+#########################################################
+# 插件基础配置
+# message_prefix: 插件消息前缀
+# timezone: 详情可见 https://www.zeitverschiebung.net/cn/all-time-zones.html
+# language: 多语言 (zh_CN / en_US)
+# bState: 是否启用bState统计
+# debug: 是否启用调试模式 (输出更多日志)
+#########################################################
+message_prefix: "&7[&a签到Plus&7] "
+timezone: "Asia/Shanghai"
+language: zh_CN
 bState: true
+debug: false
