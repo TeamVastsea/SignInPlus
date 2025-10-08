@@ -46,7 +46,7 @@ default:
     - "[COMMAND] give %player_name% apple 64"
     - "[SOUND] ENTITY_PLAYER_LEVELUP 0.5 1.0"
     - "[ITEM] apple 64"
-    - "[BROADCAST] %player_name% &6累计签到100天，获得传说奖励！"
+    - "[BROADCAST] %player_name% &6今日已签到！"
     - "[TITLE] &c签到成功！"
     - "[SLEEP] 20"
     - "[EFFECT] speed 2 10"
