@@ -143,7 +143,7 @@ top:
       - "[COMMAND] give %player_name% apple 64" 
   - rank: 2 
     actions: 
-      - '[COMMAND] give %player_name% diamond_sword 1 {"enchantments": {"minecraft:unbreaking": {"level": 1}}}' 
+      - '[COMMAND] give %player_name% diamond_sword 1' 
   - rank: 3 
     actions: 
       - "[COMMAND] give %player_name% emerald 64" 

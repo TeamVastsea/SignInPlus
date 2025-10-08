@@ -307,6 +307,24 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     sender.sendMessage("${prefix}${ChatColor.RED}当前存储不支持排行操作")
                 }
             }
+            "debug" -> {
+                if (!sender.hasPermission("signinplus.admin")) {
+                    sender.sendMessage("${prefix}${ChatColor.RED}You do not have permission to use this command.")
+                    return true
+                }
+                if (!plugin.config.getBoolean("debug", false)) {
+                    sender.sendMessage("${prefix}${ChatColor.RED}Debug mode is not enabled in config.yml.")
+                    return true
+                }
+                if (args.size < 2) {
+                    sender.sendMessage("${prefix}${ChatColor.YELLOW}Usage: /$label debug trigger <type> [value]")
+                    return true
+                }
+                when (args[1].lowercase()) {
+                    "trigger" -> handleDebugTrigger(sender, args.drop(2))
+                    else -> sender.sendMessage("${prefix}${ChatColor.YELLOW}Unknown debug command. Usage: /$label debug trigger <type> [value]")
+                }
+            }
             else -> {
                 sender.sendMessage("${prefix}${ChatColor.YELLOW}未知子命令，使用 /$label help 查看帮助")
             }
@@ -338,10 +356,93 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
         sender.sendMessage("${ChatColor.GRAY}/signinplus reload ${ChatColor.WHITE}- 重载配置并重启 Web API")
     }
 
+    private fun handleDebugTrigger(sender: CommandSender, args: List<String>) {
+        if (args.isEmpty()) {
+            sender.sendMessage("${prefix}${ChatColor.YELLOW}Usage: /signinplus debug trigger <type> [value]")
+            return
+        }
+
+        val type = args[0].lowercase()
+        val value = args.getOrNull(1)
+        val player = if (sender is org.bukkit.entity.Player) sender else null
+
+        if (player == null) {
+            sender.sendMessage("${prefix}${ChatColor.RED}This command can only be run by a player.")
+            return
+        }
+
+        sender.sendMessage("${prefix}${ChatColor.GREEN}Triggering debug reward for type '$type'...")
+
+        when (type) {
+            "default" -> plugin.rewardExecutor.runDefaultRewards(player.name)
+            "cumulative" -> {
+                val days = value?.toIntOrNull()
+                if (days == null) {
+                    sender.sendMessage("${prefix}${ChatColor.YELLOW}Usage: /signinplus debug trigger cumulative <days>")
+                    return
+                }
+                val validDays = plugin.config.getMapList("cumulative").mapNotNull { it["times"]?.toString() }
+                if (days.toString() !in validDays) {
+                    sender.sendMessage("${prefix}${ChatColor.RED}Invalid days value. Available options: ${validDays.joinToString(" | ")}")
+                    return
+                }
+                plugin.rewardExecutor.runCumulativeRewards(days, player.name, true)
+            }
+            "streak" -> {
+                val days = value?.toIntOrNull()
+                if (days == null) {
+                    sender.sendMessage("${prefix}${ChatColor.YELLOW}Usage: /signinplus debug trigger streak <days>")
+                    return
+                }
+                val validDays = plugin.config.getMapList("streak").mapNotNull { it["times"]?.toString() }
+                if (days.toString() !in validDays) {
+                    sender.sendMessage("${prefix}${ChatColor.RED}Invalid days value. Available options: ${validDays.joinToString(" | ")}")
+                    return
+                }
+                plugin.rewardExecutor.runStreakRewards(days, player.name, true)
+            }
+            "top" -> {
+                val rank = value?.toIntOrNull()
+                if (rank == null) {
+                    val ranks = plugin.config.getMapList("top").mapNotNull { it["rank"]?.toString() }.joinToString(" | ")
+                    sender.sendMessage("${prefix}${ChatColor.YELLOW}Usage: /signinplus debug trigger top <rank>")
+                    sender.sendMessage("${prefix}${ChatColor.GRAY}Available ranks: $ranks")
+                    return
+                }
+                val validRanks = plugin.config.getMapList("top").mapNotNull { it["rank"]?.toString() }
+                if (rank.toString() !in validRanks) {
+                    sender.sendMessage("${prefix}${ChatColor.RED}Invalid rank value. Available options: ${validRanks.joinToString(" | ")}")
+                    return
+                }
+                plugin.rewardExecutor.runTopRewards(rank, player.name, true)
+            }
+            "special_dates" -> {
+                if (value == null) {
+                    val dates = plugin.config.getMapList("special_dates").mapNotNull { it["date"]?.toString() }.joinToString(" | ")
+                    sender.sendMessage("${prefix}${ChatColor.YELLOW}Usage: /signinplus debug trigger special_dates <date>")
+                    sender.sendMessage("${prefix}${ChatColor.GRAY}Available dates: $dates")
+                    return
+                }
+                val validDates = plugin.config.getMapList("special_dates").mapNotNull { it["date"]?.toString() }
+                if (value !in validDates) {
+                    sender.sendMessage("${prefix}${ChatColor.RED}Invalid date value. Available options: ${validDates.joinToString(" | ")}")
+                    return
+                }
+                plugin.rewardExecutor.runSpecialDateRewards(value, player.name)
+            }
+            else -> {
+                sender.sendMessage("${prefix}${ChatColor.YELLOW}Unknown trigger type: $type")
+                return
+            }
+        }
+
+        sender.sendMessage("${prefix}${ChatColor.GREEN}Debug trigger for '$type' executed for ${player.name}.")
+    }
+
     override fun onTabComplete(sender: CommandSender, command: Command, alias: String, args: Array<out String>): MutableList<String> {
         val out = mutableListOf<String>()
         if (args.size == 1) {
-            val base = listOf("help", "reload", "force_check_in", "status", "make_up", "correction_slip", "points", "top")
+            val base = listOf("help", "reload", "force_check_in", "status", "make_up", "correction_slip", "points", "top", "debug")
             out.addAll(base.filter { it.startsWith(args[0], ignoreCase = true) })
             return out
         }
@@ -349,6 +450,34 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
         when (args[0].lowercase()) {
             "top" -> {
                 if (args.size == 2) out.addAll(listOf("total", "streak").filter { it.startsWith(args[1], ignoreCase = true) })
+            }
+            "debug" -> {
+                if (args.size == 2) {
+                    out.addAll(listOf("trigger").filter { it.startsWith(args[1], ignoreCase = true) })
+                }
+                if (args.size == 3) {
+                    out.addAll(listOf("default", "cumulative", "streak", "top", "special_dates").filter { it.startsWith(args[2], ignoreCase = true) })
+                }
+                if (args.size == 4) {
+                    when (args[2].lowercase()) {
+                        "top" -> {
+                            val ranks = plugin.config.getMapList("top").mapNotNull { it["rank"]?.toString() }
+                            out.addAll(ranks.filter { it.startsWith(args[3], ignoreCase = true) })
+                        }
+                        "special_dates" -> {
+                            val dates = plugin.config.getMapList("special_dates").mapNotNull { it["date"]?.toString() }
+                            out.addAll(dates.filter { it.startsWith(args[3], ignoreCase = true) })
+                        }
+                        "cumulative" -> {
+                            val times = plugin.config.getMapList("cumulative").mapNotNull { it["times"]?.toString() }
+                            out.addAll(times.filter { it.startsWith(args[3], ignoreCase = true) })
+                        }
+                        "streak" -> {
+                            val times = plugin.config.getMapList("streak").mapNotNull { it["times"]?.toString() }
+                            out.addAll(times.filter { it.startsWith(args[3], ignoreCase = true) })
+                        }
+                    }
+                }
             }
             "points" -> {
                 if (args.size == 2) {
