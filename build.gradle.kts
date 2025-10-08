@@ -1,6 +1,6 @@
 plugins {
     kotlin("jvm") version "1.9.23"
-    id("com.github.johnrengelman.shadow") version "8.1.1"
+    id("com.gradleup.shadow") version "9.2.2"
 }
 
 group = "cc.vastsea"
@@ -8,6 +8,7 @@ version = "0.1.0"
 
 repositories {
     mavenCentral()
+    gradlePluginPortal()
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://repo.extendedclip.com/content/repositories/placeholderapi/")
 }
@@ -17,6 +18,7 @@ dependencies {
     compileOnly("me.clip:placeholderapi:2.11.5")
     implementation(kotlin("stdlib"))
     implementation("org.xerial:sqlite-jdbc:3.46.0.0")
+    implementation("org.bstats:bstats-bukkit:3.0.2")
 }
 
 kotlin {
@@ -28,5 +30,12 @@ tasks {
         filesMatching("plugin.yml") {
             expand(mapOf("version" to project.version))
         }
+    }
+    shadowJar {
+        relocate("org.bstats", "cc.vastsea.bstats")
+        archiveClassifier.set("")
+    }
+    build {
+        dependsOn(shadowJar)
     }
 }
