@@ -1,33 +1,28 @@
 package cc.vastsea
 
+import cc.vastsea.storage.*
 import cc.vastsea.web.WebApiServer
-import cc.vastsea.storage.InMemoryStorage
-import cc.vastsea.storage.SqliteStorage
 import org.bukkit.plugin.java.JavaPlugin
+import org.jetbrains.exposed.sql.SchemaUtils.create
+import org.jetbrains.exposed.sql.transactions.transaction
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
 
 class SignInPlus : JavaPlugin() {
-    lateinit var storage: cc.vastsea.storage.Storage
     private var webServer: WebApiServer? = null
     lateinit var rewardExecutor: cc.vastsea.rewards.RewardExecutor
 
     override fun onEnable() {
         // 保存默认配置
         saveDefaultConfig()
+        instance = this
 
         // 初始化存储
-        val storageType = config.getString("storage.type") ?: "sqlite"
         val tz = config.getString("timezone") ?: "Asia/Shanghai"
-        storage = when (storageType.lowercase()) {
-            "sqlite" -> {
-                val dbFile = dataFolder.resolve("signinplus.db")
-                if (!dataFolder.exists()) dataFolder.mkdirs()
-                SqliteStorage(dbFile.absolutePath, tz)
-            }
-            else -> {
-                logger.warning("暂不支持的存储类型: $storageType，回退到内存实现")
-                InMemoryStorage()
-            }
-        }
+        zoneId = ZoneId.of(tz)
+        transaction(DatabaseHelper.database) { create(Checkins, ClaimedRewards, CorrectionSlips, PluginMeta, Points) }
+        PluginMeta.initFirstLaunchDay()
 
         // 奖励执行器
         rewardExecutor = cc.vastsea.rewards.RewardExecutor(this)
@@ -91,12 +86,23 @@ class SignInPlus : JavaPlugin() {
         val enabled = web?.getBoolean("enable_web_api") ?: false
         if (!enabled) return
 
-        val address = web?.getString("web_api_address") ?: "0.0.0.0"
-        val port = web?.getInt("web_api_port") ?: 7999
-        val endpoint = web?.getString("web_api_endpoint") ?: "/api"
+        val address = web.getString("web_api_address") ?: "0.0.0.0"
+        val port = web.getInt("web_api_port")
+        val endpoint = web.getString("web_api_endpoint") ?: "/api"
 
-        webServer = WebApiServer(this, address, port, endpoint)
+        webServer = WebApiServer(address, port, endpoint)
         webServer?.start()
         logger.info("Web API 已启动: http://$address:$port$endpoint")
+    }
+
+    companion object {
+        lateinit var instance: SignInPlus
+            private set
+
+        lateinit var zoneId: ZoneId
+            private set
+
+        fun today(): LocalDate = LocalDate.now(zoneId)
+        fun now(): LocalTime = LocalTime.now(zoneId)
     }
 }

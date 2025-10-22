@@ -1,6 +1,7 @@
 plugins {
-    kotlin("jvm") version "1.9.23"
+    kotlin("jvm") version "2.2.20"
     id("com.gradleup.shadow") version "9.2.2"
+    id("xyz.jpenilla.run-paper") version "2.3.1"
 }
 
 group = "cc.vastsea"
@@ -19,10 +20,19 @@ dependencies {
     implementation(kotlin("stdlib"))
     implementation("org.xerial:sqlite-jdbc:3.46.0.0")
     implementation("org.bstats:bstats-bukkit:3.0.2")
+    
+    // Database dependencies
+    implementation("org.jetbrains.exposed:exposed-core:0.58.0")
+    implementation("org.jetbrains.exposed:exposed-dao:0.58.0")
+    implementation("org.jetbrains.exposed:exposed-jdbc:0.58.0")
+    implementation("org.jetbrains.exposed:exposed-java-time:0.58.0")
+    implementation("org.postgresql:postgresql:42.7.5")
+    implementation("com.mysql:mysql-connector-j:9.2.0")
+    implementation("com.zaxxer:HikariCP:6.2.1")
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
 }
 
 tasks {
@@ -37,5 +47,8 @@ tasks {
     }
     build {
         dependsOn(shadowJar)
+    }
+    runServer {
+        minecraftVersion("1.21")
     }
 }

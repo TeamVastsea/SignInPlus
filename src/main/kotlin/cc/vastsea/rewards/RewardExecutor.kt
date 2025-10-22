@@ -1,7 +1,9 @@
 package cc.vastsea.rewards
 
 import cc.vastsea.SignInPlus
-import cc.vastsea.storage.SqliteStorage
+import cc.vastsea.storage.Checkins
+import cc.vastsea.storage.ClaimedRewards
+import cc.vastsea.storage.Points
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.ChatColor
@@ -11,6 +13,7 @@ import org.bukkit.inventory.ItemStack
 import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
 import java.time.LocalDate
+import java.util.UUID
 import kotlin.random.Random
 
 class RewardExecutor(private val plugin: SignInPlus) {
@@ -50,26 +53,26 @@ class RewardExecutor(private val plugin: SignInPlus) {
         }
     }
 
-    fun onSignedIn(playerName: String) {
-        logDebug("Processing sign-in for player: &b$playerName")
+    fun onSignedIn(player: UUID) {
+        logDebug("Processing sign-in for player: &b$player")
         // 默认奖励
-        runActionsFromConfig("default.actions", playerName)
+        runActionsFromConfig("default.actions", player)
 
         // 累计奖励
-        plugin.storage.getSignedDates(playerName).let { signedDates ->
+        Checkins.getSignedDates(player).let { signedDates ->
             val total = signedDates.size
-            runCumulativeRewards(total, playerName)
+            runCumulativeRewards(total, player)
 
             // 连续奖励
             val streak = checkStreak(signedDates)
-            runStreakRewards(streak, playerName)
+            runStreakRewards(streak, player)
         }
 
         // 排行奖励
-        val rankStr = plugin.storage.getRankToday(playerName)
+        val rankStr = Checkins.getRankToday(player)
         val rank = rankStr.toIntOrNull()
         if (rank != null) {
-            runTopRewards(rank, playerName)
+            runTopRewards(rank, player)
         }
 
         // 特殊日期奖励
@@ -89,38 +92,38 @@ class RewardExecutor(private val plugin: SignInPlus) {
 
             if (match) {
                 if (isDebug) {
-                    plugin.logger.info("[Debug] Matched special date '$date' for player $playerName. Repeating $repeatTime time(s).")
+                    plugin.logger.info("[Debug] Matched special date '$date' for player $player. Repeating $repeatTime time(s).")
                 }
                 repeat(repeatTime.coerceAtLeast(1)) {
-                    runActionLines(actions, playerName)
+                    runActionLines(actions, player)
                 }
             }
         }
     }
 
-    fun runDefaultRewards(playerName: String) {
-        runActionsFromConfig("default.actions", playerName)
+    fun runDefaultRewards(player: UUID) {
+        runActionsFromConfig("default.actions", player)
     }
 
-    fun runCumulativeRewards(totalDays: Int, playerName: String, force: Boolean = false) {
+    fun runCumulativeRewards(totalDays: Int, player: UUID, force: Boolean = false) {
         val list = plugin.config.getMapList("cumulative")
         if (list.isEmpty()) return
         val enabled = list.firstOrNull()?.get("enable") as? Boolean
             ?: list.find { it.containsKey("enable") }?.get("enable") as? Boolean
             ?: false
         if (!enabled && !force) return
-        logDebug("Checking cumulative rewards for &b$playerName &r(Total Days: &a$totalDays&r)")
+        logDebug("Checking cumulative rewards for &b$player &r(Total Days: &a$totalDays&r)")
         val eligible = list.filter { it.containsKey("times") }
             .mapNotNull { m ->
                 val threshold = m["times"] as? Int ?: return@mapNotNull null
-                if (totalDays >= threshold && !plugin.storage.hasClaimedTotalReward(playerName, threshold)) threshold to m else null
+                if (totalDays >= threshold && !ClaimedRewards.hasClaimedTotalReward(player, threshold)) threshold to m else null
             }
         eligible.forEach { (threshold, rewardMap) ->
             val actions = (rewardMap["actions"] as? List<*>) ?: emptyList<Any>()
-            logDebug("Granting cumulative reward for &a$threshold &rdays to &b$playerName&r. Actions: &c${actions.joinToString(", ")}")
-            runActionLines(actions, playerName)
+            logDebug("Granting cumulative reward for &a$threshold &rdays to &b$player&r. Actions: &c${actions.joinToString(", ")}")
+            runActionLines(actions, player)
             if (!force) {
-                plugin.storage.markClaimedTotalReward(playerName, threshold)
+                ClaimedRewards.markClaimedTotalReward(player, threshold)
             }
         }
     }
@@ -142,49 +145,49 @@ class RewardExecutor(private val plugin: SignInPlus) {
         return streak
     }
 
-    fun runStreakRewards(streakDays: Int, playerName: String, force: Boolean = false) {
+    fun runStreakRewards(streakDays: Int, player: UUID, force: Boolean = false) {
         val list = plugin.config.getMapList("streak")
         if (list.isEmpty()) return
         val enabled = list.firstOrNull()?.get("enable") as? Boolean
             ?: list.find { it.containsKey("enable") }?.get("enable") as? Boolean
             ?: false
         if (!enabled && !force) return
-        logDebug("Checking streak rewards for &b$playerName &r(Streak: &a$streakDays &rdays)")
+        logDebug("Checking streak rewards for &b$player &r(Streak: &a$streakDays &rdays)")
         val eligible = list.filter { it.containsKey("times") }
             .mapNotNull { m ->
                 val threshold = m["times"] as? Int ?: return@mapNotNull null
-                if (streakDays >= threshold && !plugin.storage.hasClaimedStreakReward(playerName, threshold)) threshold to m else null
+                if (streakDays >= threshold && !ClaimedRewards.hasClaimedStreakReward(player, threshold)) threshold to m else null
             }
         eligible.forEach { (threshold, rewardMap) ->
             val actions = (rewardMap["actions"] as? List<*>) ?: emptyList<Any>()
-            logDebug("Granting streak reward for &a$threshold &rdays to &b$playerName&r. Actions: &c${actions.joinToString(", ")}")
-            runActionLines(actions, playerName)
+            logDebug("Granting streak reward for &a$threshold &rdays to &b$player&r. Actions: &c${actions.joinToString(", ")}")
+            runActionLines(actions, player)
             if (!force) {
-                plugin.storage.markClaimedStreakReward(playerName, threshold)
+                ClaimedRewards.markClaimedStreakReward(player, threshold)
             }
         }
     }
 
-    fun runTopRewards(rank: Int, playerName: String, force: Boolean = false) {
+    fun runTopRewards(rank: Int, player: UUID, force: Boolean = false) {
         val list = plugin.config.getMapList("top")
         if (list.isEmpty()) return
         val enabled = list.firstOrNull()?.get("enable") as? Boolean
             ?: list.find { it.containsKey("enable") }?.get("enable") as? Boolean
             ?: false
         if (!enabled && !force) return
-        logDebug("Checking top rewards for &b$playerName &r(Rank: &a$rank&r)")
+        logDebug("Checking top rewards for &b$player &r(Rank: &a$rank&r)")
         for (m in list) {
             val r = m["rank"] as? Int ?: continue
             if (rank == r) {
                 val actions = m["actions"] as? List<*> ?: continue
-                logDebug("Granting top reward for rank &a$rank &rto &b$playerName&r. Actions: &c${actions.joinToString(", ")}")
-                runActionLines(actions, playerName)
+                logDebug("Granting top reward for rank &a$rank &rto &b$player&r. Actions: &c${actions.joinToString(", ")}")
+                runActionLines(actions, player)
                 break
             }
         }
     }
 
-    fun runSpecialDateRewards(dateStr: String, playerName: String) {
+    fun runSpecialDateRewards(dateStr: String, player: UUID) {
         val specials = plugin.config.getMapList("special_dates")
         val targetDate = try {
             java.time.LocalDate.parse(dateStr)
@@ -206,22 +209,22 @@ class RewardExecutor(private val plugin: SignInPlus) {
             }
 
             if (match) {
-                logDebug("Matched special date '&a$date&r' for player &b$playerName&r. Repeating &a$repeatTime &rtime(s). Actions: &c${actions.joinToString(", ")}")
+                logDebug("Matched special date '&a$date&r' for player &b$player&r. Repeating &a$repeatTime &rtime(s). Actions: &c${actions.joinToString(", ")}")
                 repeat(repeatTime.coerceAtLeast(1)) {
-                    runActionLines(actions, playerName)
+                    runActionLines(actions, player)
                 }
             }
         }
     }
 
-    private fun runActionsFromConfig(path: String, playerName: String) {
+    private fun runActionsFromConfig(path: String, player: UUID) {
         val actions = plugin.config.getStringList(path)
         if (actions.isEmpty()) return
-        logDebug("Running actions from config path '&a$path&r' for player &b$playerName&r. Actions: &c${actions.joinToString(", ")}")
-        runActionLines(actions, playerName)
+        logDebug("Running actions from config path '&a$path&r' for player &b$player&r. Actions: &c${actions.joinToString(", ")}")
+        runActionLines(actions, player)
     }
 
-    private fun runActionLines(lines: List<*>, playerName: String) {
+    private fun runActionLines(lines: List<*>, player: UUID) {
         // 将动作顺序执行；SLEEP 使用延迟调度
         var delayTicks = 0L
         var i = 0
@@ -242,7 +245,7 @@ class RewardExecutor(private val plugin: SignInPlus) {
                     j++
                 }
                 val chosen = block.shuffled().take(n.coerceAtMost(block.size))
-                chosen.forEach { act -> scheduleAction(act, playerName, delayTicks) }
+                chosen.forEach { act -> scheduleAction(act, player, delayTicks) }
                 i = j + 1
                 continue
             }
@@ -267,7 +270,7 @@ class RewardExecutor(private val plugin: SignInPlus) {
                     for ((w, act) in weighted) {
                         if (r < w) { picked = act; break } else r -= w
                     }
-                    picked?.let { scheduleAction(it, playerName, delayTicks) }
+                    picked?.let { scheduleAction(it, player, delayTicks) }
                 }
                 i = j + 1
                 continue
@@ -277,7 +280,7 @@ class RewardExecutor(private val plugin: SignInPlus) {
             if (raw.startsWith("[PROB=")) {
                 val prob = raw.substringAfter("[PROB=").substringBefore("]").toDoubleOrNull() ?: 1.0
                 val act = raw.substringAfter("]").trim()
-                if (Random.nextDouble() <= prob) scheduleAction(act, playerName, delayTicks)
+                if (Random.nextDouble() <= prob) scheduleAction(act, player, delayTicks)
                 i++
                 continue
             }
@@ -289,22 +292,22 @@ class RewardExecutor(private val plugin: SignInPlus) {
                 continue
             }
 
-            scheduleAction(raw, playerName, delayTicks)
+            scheduleAction(raw, player, delayTicks)
             i++
         }
     }
 
-    private fun scheduleAction(action: String, playerName: String, delayTicks: Long) {
-        Bukkit.getScheduler().runTaskLater(plugin, Runnable { runSingleAction(action, playerName) }, delayTicks)
+    private fun scheduleAction(action: String, player: UUID, delayTicks: Long) {
+        Bukkit.getScheduler().runTaskLater(plugin, Runnable { runSingleAction(action, player) }, delayTicks)
     }
 
-    private fun runSingleAction(action: String, playerName: String) {
+    private fun runSingleAction(action: String, player: UUID) {
         val server = plugin.server
-        val player: Player? = server.getPlayerExact(playerName)
+        val player = server.getPlayer(player)
 
         when {
             action.startsWith("[COMMAND]") -> {
-                val cmd = action.substringAfter("[COMMAND]").trim().replace("%player_name%", playerName)
+                val cmd = action.substringAfter("[COMMAND]").trim().replace("%player_name%", player?.displayName ?: "")
                 server.dispatchCommand(server.consoleSender, cmd)
             }
             action.startsWith("[MESSAGE]") -> {
@@ -317,7 +320,7 @@ class RewardExecutor(private val plugin: SignInPlus) {
                 player?.sendTitle(title, sub, 10, 60, 10)
             }
             action.startsWith("[BROADCAST]") -> {
-                val msg = ChatColor.translateAlternateColorCodes('&', action.substringAfter("[BROADCAST]").trim().replace("%player_name%", playerName))
+                val msg = ChatColor.translateAlternateColorCodes('&', action.substringAfter("[BROADCAST]").trim().replace("%player_name%", player?.displayName ?:""))
                 server.broadcastMessage(prefix + msg)
             }
             action.startsWith("[SOUND]") -> {
@@ -368,14 +371,8 @@ class RewardExecutor(private val plugin: SignInPlus) {
                 val value = parsePointsValue(spec)
                 // 以“分”为单位存储：显示时除以100；存储时乘以100并四舍五入为整数
                 val cents = kotlin.math.round(value * 100.0)
-                if (plugin.storage is SqliteStorage) {
-                    (plugin.storage as SqliteStorage).addPoints(playerName, cents.toDouble())
-                } else {
-                    val old = plugin.storage.getPoints(playerName)
-                    if (plugin.storage is SqliteStorage) {
-                        (plugin.storage as SqliteStorage).setPoints(playerName, old + cents)
-                    }
-                }
+                if (player == null) return
+                Points.addPoints(player.uniqueId, cents)
             }
         }
     }

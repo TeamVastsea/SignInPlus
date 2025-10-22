@@ -1,13 +1,24 @@
 package cc.vastsea
 
+import cc.vastsea.storage.Checkins
+import cc.vastsea.storage.CorrectionSlips
+import cc.vastsea.storage.PlayerStat
+import cc.vastsea.storage.Points
 import org.bukkit.ChatColor
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
+import org.bukkit.entity.Player
+import java.util.UUID
 
 class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCompleter {
-    private val prefix get() = ChatColor.translateAlternateColorCodes('&', plugin.config.getString("message_prefix") ?: "&7[&a签到Plus&7] ")
+    private val prefix
+        get() = ChatColor.translateAlternateColorCodes(
+            '&',
+            plugin.config.getString("message_prefix") ?: "&7[&a签到Plus&7] "
+        )
+
     private fun onlinePlayerNames(): List<String> = plugin.server.onlinePlayers.map { it.name }
     private fun suggestNumbers(): List<String> = listOf("1", "2", "3", "5", "10")
     private fun formatPointsDisplay(raw: Double): String = String.format("%.2f", raw / 100.0)
@@ -15,23 +26,18 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         if (args.isEmpty()) {
             val alias = label.lowercase()
-            if (alias in listOf("signin", "checkin", "qiandao", "qd")) {
+            if (alias in listOf("signin", "checkin", "qiandao", "qd") && sender is Player) {
                 if (!sender.hasPermission("signinplus.user")) {
                     sender.sendMessage("${prefix}${ChatColor.RED}你没有权限执行此命令！")
                     return true
                 }
-                if (plugin.storage is cc.vastsea.storage.SqliteStorage) {
-                    val s = (plugin.storage as cc.vastsea.storage.SqliteStorage)
-                    val name = sender.name
-                    if (s.isSignedIn(name)) {
-                        sender.sendMessage("${prefix}${ChatColor.YELLOW}你今天已经签到过了！")
-                    } else {
-                        s.signInToday(name)
-                        plugin.rewardExecutor.onSignedIn(name)
-                        sender.sendMessage("${prefix}${ChatColor.GREEN}签到成功！")
-                    }
+
+                if (Checkins.isSignedIn(sender.uniqueId)) {
+                    sender.sendMessage("${prefix}${ChatColor.YELLOW}你今天已经签到过了！")
                 } else {
-                    sender.sendMessage("${prefix}${ChatColor.RED}当前存储不支持签到操作")
+                    Checkins.signInToday(sender.uniqueId)
+                    plugin.rewardExecutor.onSignedIn(sender.uniqueId)
+                    sender.sendMessage("${prefix}${ChatColor.GREEN}签到成功！")
                 }
                 return true
             }
@@ -50,44 +56,40 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     return true
                 }
                 val target = args[1]
-                if (plugin.storage is cc.vastsea.storage.SqliteStorage) {
-                    (plugin.storage as cc.vastsea.storage.SqliteStorage).signInToday(target)
-                    plugin.rewardExecutor.onSignedIn(target)
-                    sender.sendMessage("${prefix}${ChatColor.GREEN}已为 $target 强制签到今日")
-                } else {
-                    sender.sendMessage("${prefix}${ChatColor.RED}当前存储不支持强制签到操作")
-                }
+                val player = plugin.server.getPlayerExact(target) ?: return false
+                Checkins.signInToday(player.uniqueId)
+                plugin.rewardExecutor.onSignedIn(player.uniqueId)
+                sender.sendMessage("${prefix}${ChatColor.GREEN}已为 $target 强制签到今日")
             }
+
             "status" -> {
                 if (!sender.hasPermission("signinplus.user")) {
                     sender.sendMessage("${prefix}${ChatColor.RED}你没有权限执行此命令！")
                     return true
                 }
                 val targetName = if (args.size > 1) args[1] else sender.name
-                if (plugin.storage is cc.vastsea.storage.SqliteStorage) {
-                    val s = plugin.storage as cc.vastsea.storage.SqliteStorage
-                    val stat = s.getInfo(targetName)
-                    val signedToday = s.isSignedIn(targetName)
-                    val totalDays = s.getTotalDays(targetName)
-                    val streakDays = s.getStreakDays(targetName)
-                    val missedDays = s.getMissedDays(targetName)
-                    val correctionSlips = stat.correctionSlipAmount
-                    val usableSlips = missedDays.coerceAtMost(correctionSlips)
+                val player = plugin.server.getPlayerExact(targetName) ?: return false
+                val stat = PlayerStat(player.uniqueId)
+                val signedToday = Checkins.isSignedIn(player.uniqueId)
+                val totalDays = Checkins.getTotalDays(player.uniqueId)
+                val streakDays = Checkins.getStreakDays(player.uniqueId)
+                val missedDays = Checkins.getMissedDays(player.uniqueId)
+                val correctionSlips = stat.correctionSlipAmount
+                val usableSlips = missedDays.coerceAtMost(correctionSlips)
 
-                    sender.sendMessage("${prefix}${ChatColor.AQUA}玩家 ${targetName} 的签到状态")
-                    sender.sendMessage("今日签到: ${if (signedToday) "${ChatColor.GREEN}已签到" else "${ChatColor.YELLOW}未签到"}")
-                    sender.sendMessage("总签到天数: ${ChatColor.GOLD}$totalDays")
-                    sender.sendMessage("连续签到天数: ${ChatColor.GOLD}$streakDays")
-                    sender.sendMessage("漏签天数: ${ChatColor.RED}$missedDays")
-                    sender.sendMessage("剩余补签卡: ${ChatColor.GOLD}$correctionSlips")
-                    sender.sendMessage("当前可使用补签卡: ${ChatColor.GOLD}$usableSlips")
-                } else {
-                    sender.sendMessage("${prefix}${ChatColor.RED}当前存储不支持查看状态")
-                }
+                sender.sendMessage("${prefix}${ChatColor.AQUA}玩家 $targetName 的签到状态")
+                sender.sendMessage("今日签到: ${if (signedToday) "${ChatColor.GREEN}已签到" else "${ChatColor.YELLOW}未签到"}")
+                sender.sendMessage("总签到天数: ${ChatColor.GOLD}$totalDays")
+                sender.sendMessage("连续签到天数: ${ChatColor.GOLD}$streakDays")
+                sender.sendMessage("漏签天数: ${ChatColor.RED}$missedDays")
+                sender.sendMessage("剩余补签卡: ${ChatColor.GOLD}$correctionSlips")
+                sender.sendMessage("当前可使用补签卡: ${ChatColor.GOLD}$usableSlips")
             }
+
             "help" -> {
                 sendHelp(sender)
             }
+
             "reload" -> {
                 if (!sender.hasPermission("signinplus.admin")) {
                     sender.sendMessage("${prefix}${ChatColor.RED}你没有权限执行此命令！")
@@ -96,9 +98,10 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                 plugin.reloadAll()
                 sender.sendMessage("${prefix}${ChatColor.GREEN}配置已重载并重启 Web API（如启用）")
             }
+
             "points" -> {
-                if (args.size == 1) {
-                    val p = plugin.storage.getPoints(sender.name)
+                if (args.size == 1 && sender is Player) {
+                    val p = Points.getPoints(sender.uniqueId)
                     sender.sendMessage("${prefix}你的积分: ${formatPointsDisplay(p)}")
                     return true
                 }
@@ -110,119 +113,133 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                             sender.sendMessage("${prefix}${ChatColor.RED}你没有权限执行此命令！")
                             return true
                         }
-                        if (plugin.storage is cc.vastsea.storage.SqliteStorage) {
-                            if (args.size >= 4) {
-                                val target = args[2]
-                                val amount = args[3].toDoubleOrNull()
-                                if (amount == null) {
-                                    sender.sendMessage("${prefix}${ChatColor.RED}积分必须是数字，例如 1 或 1.25")
-                                } else {
-                                    val cents = kotlin.math.round(amount * 100.0).toDouble()
-                                    (plugin.storage as cc.vastsea.storage.SqliteStorage).setPoints(target, cents)
-                                    sender.sendMessage("${prefix}${ChatColor.GREEN}已设置 $target 的积分为 ${String.format("%.2f", amount)}")
-                                }
-                            } else sender.sendMessage("${prefix}${ChatColor.YELLOW}用法: /$label points set <player> <amount>")
-                        } else sender.sendMessage("${prefix}${ChatColor.RED}当前存储不支持设置积分")
+                        if (args.size >= 4) {
+                            val target = args[2]
+                            val amount = args[3].toDoubleOrNull()
+                            val player = plugin.server.getPlayerExact(target) ?: return false
+
+                            if (amount == null) {
+                                sender.sendMessage("${prefix}${ChatColor.RED}积分必须是数字，例如 1 或 1.25")
+                            } else {
+                                val cents = kotlin.math.round(amount * 100.0).toDouble()
+                                Points.setPoints(player.uniqueId, cents)
+                                sender.sendMessage(
+                                    "${prefix}${ChatColor.GREEN}已设置 $target 的积分为 ${
+                                        String.format(
+                                            "%.2f",
+                                            amount
+                                        )
+                                    }"
+                                )
+                            }
+                        } else sender.sendMessage("${prefix}${ChatColor.YELLOW}用法: /$label points set <player> <amount>")
                     }
+
                     "clear" -> {
                         if (!sender.hasPermission("signinplus.admin")) {
                             sender.sendMessage("${prefix}${ChatColor.RED}你没有权限执行此命令！")
                             return true
                         }
-                        if (plugin.storage is cc.vastsea.storage.SqliteStorage) {
-                            if (args.size >= 3) {
-                                val target = args[2]
-                                (plugin.storage as cc.vastsea.storage.SqliteStorage).setPoints(target, 0.0)
-                                sender.sendMessage("${prefix}${ChatColor.GREEN}已清零 $target 的积分")
-                            } else sender.sendMessage("${prefix}${ChatColor.YELLOW}用法: /$label points clear <player>")
-                        } else sender.sendMessage("${prefix}${ChatColor.RED}当前存储不支持设置积分")
+                        if (args.size >= 3) {
+                            val target = args[2]
+                            val player = plugin.server.getPlayerExact(target) ?: return false
+                            Points.setPoints(player.uniqueId, 0.0)
+                            sender.sendMessage("${prefix}${ChatColor.GREEN}已清零 $target 的积分")
+                        } else sender.sendMessage("${prefix}${ChatColor.YELLOW}用法: /$label points clear <player>")
                     }
+
                     "decrease" -> {
                         if (!sender.hasPermission("signinplus.admin")) {
                             sender.sendMessage("${prefix}${ChatColor.RED}你没有权限执行此命令！")
                             return true
                         }
-                        if (plugin.storage is cc.vastsea.storage.SqliteStorage) {
-                            if (args.size >= 4) {
-                                val target = args[2]
-                                val amount = args[3].toDoubleOrNull()
-                                if (amount == null) {
-                                    sender.sendMessage("${prefix}${ChatColor.RED}积分必须是数字，例如 1 或 1.25")
-                                } else {
-                                    val cents = -kotlin.math.round(amount * 100.0).toDouble()
-                                    (plugin.storage as cc.vastsea.storage.SqliteStorage).addPoints(target, cents)
-                                    sender.sendMessage("${prefix}${ChatColor.GREEN}已减少 $target 的积分 ${String.format("%.2f", amount)}")
-                                }
-                            } else sender.sendMessage("${prefix}${ChatColor.YELLOW}用法: /$label points decrease <player> <amount>")
-                        } else sender.sendMessage("${prefix}${ChatColor.RED}当前存储不支持设置积分")
+                        if (args.size >= 4) {
+                            val target = args[2]
+                            val amount = args[3].toDoubleOrNull()
+                            if (amount == null) {
+                                sender.sendMessage("${prefix}${ChatColor.RED}积分必须是数字，例如 1 或 1.25")
+                            } else {
+                                val cents = -kotlin.math.round(amount * 100.0)
+                                val player = plugin.server.getPlayerExact(target) ?: return false
+                                Points.addPoints(player.uniqueId, cents)
+                                sender.sendMessage(
+                                    "${prefix}${ChatColor.GREEN}已减少 $target 的积分 ${
+                                        String.format(
+                                            "%.2f",
+                                            amount
+                                        )
+                                    }"
+                                )
+                            }
+                        } else sender.sendMessage("${prefix}${ChatColor.YELLOW}用法: /$label points decrease <player> <amount>")
                     }
+
                     else -> {
                         // 兼容：/points <player> 查看某人积分
                         val target = args[1]
-                        val p = plugin.storage.getPoints(target)
+                        val player = plugin.server.getPlayerExact(target) ?: return false
+                        val p = Points.getPoints(player.uniqueId)
                         sender.sendMessage("${prefix}$target 的积分: ${formatPointsDisplay(p)}")
                     }
                 }
             }
+
             "correction_slip" -> {
                 if (!sender.hasPermission("signinplus.admin")) {
                     sender.sendMessage("${prefix}${ChatColor.RED}你没有权限执行此命令！")
                     return true
                 }
-                if (plugin.storage is cc.vastsea.storage.SqliteStorage) {
-                    val s = (plugin.storage as cc.vastsea.storage.SqliteStorage)
-                    if (args.size == 1) {
-                        val stat = s.getInfo(sender.name)
-                        val missedDays = s.getMissedDays(sender.name)
-                        val correctionSlips = stat.correctionSlipAmount
-                        val usableSlips = missedDays.coerceAtMost(correctionSlips)
-                        sender.sendMessage("${prefix}剩余补签卡: ${ChatColor.GOLD}$correctionSlips")
-                        sender.sendMessage("${prefix}当前可使用补签卡: ${ChatColor.GOLD}$usableSlips")
-                        return true
-                    }
-                    if (args.size >= 2) {
-                        when (args[1].lowercase()) {
-                            "give" -> {
-                                if (args.size >= 3) {
-                                    val target = args[2]
-                                    val amount = if (args.size >= 4) args[3].toIntOrNull() ?: 1 else 1
-                                    s.giveCorrectionSlip(target, amount)
-                                    sender.sendMessage("${prefix}${ChatColor.GREEN}已给予 $target 补签卡 $amount 张")
-                                } else sender.sendMessage("${prefix}${ChatColor.YELLOW}用法: /$label correction_slip give <player> [amount]")
-                            }
-                            "decrease" -> {
-                                if (args.size >= 3) {
-                                    val target = args[2]
-                                    val amount = if (args.size >= 4) args[3].toIntOrNull() ?: 1 else 1
-                                    s.decreaseCorrectionSlip(target, amount)
-                                    sender.sendMessage("${prefix}${ChatColor.GREEN}已减少 $target 补签卡 $amount 张")
-                                } else sender.sendMessage("${prefix}${ChatColor.YELLOW}用法: /$label correction_slip decrease <player> [amount]")
-                            }
-                            "clear" -> {
-                                if (args.size >= 3) {
-                                    val target = args[2]
-                                    s.clearCorrectionSlip(target)
-                                    sender.sendMessage("${prefix}${ChatColor.GREEN}已清除 $target 的补签卡")
-                                } else sender.sendMessage("${prefix}${ChatColor.YELLOW}用法: /$label correction_slip clear <player>")
-                            }
-                            else -> sender.sendMessage("${prefix}${ChatColor.YELLOW}子命令: give|decrease|clear")
-                        }
-                    } else sender.sendMessage("${prefix}${ChatColor.YELLOW}用法: /$label correction_slip <give|decrease|clear> ...")
-                } else {
-                    sender.sendMessage("${prefix}${ChatColor.RED}当前存储不支持补签卡操作")
+                if (args.size == 1 && sender is Player) {
+                    val stat = PlayerStat(sender.uniqueId)
+                    val missedDays = Checkins.getMissedDays(sender.uniqueId)
+                    val correctionSlips = stat.correctionSlipAmount
+                    val usableSlips = missedDays.coerceAtMost(correctionSlips)
+                    sender.sendMessage("${prefix}剩余补签卡: ${ChatColor.GOLD}$correctionSlips")
+                    sender.sendMessage("${prefix}当前可使用补签卡: ${ChatColor.GOLD}$usableSlips")
+                    return true
                 }
+                if (args.size >= 2) {
+                    when (args[1].lowercase()) {
+                        "give" -> {
+                            if (args.size >= 3) {
+                                val target = args[2]
+                                val amount = if (args.size >= 4) args[3].toIntOrNull() ?: 1 else 1
+                                val player = plugin.server.getPlayerExact(target) ?: return false
+                                CorrectionSlips.giveCorrectionSlip(player.uniqueId, amount)
+                                sender.sendMessage("${prefix}${ChatColor.GREEN}已给予 $target 补签卡 $amount 张")
+                            } else sender.sendMessage("${prefix}${ChatColor.YELLOW}用法: /$label correction_slip give <player> [amount]")
+                        }
+
+                        "decrease" -> {
+                            if (args.size >= 3) {
+                                val target = args[2]
+                                val amount = if (args.size >= 4) args[3].toIntOrNull() ?: 1 else 1
+                                val player = plugin.server.getPlayerExact(target) ?: return false
+                                CorrectionSlips.decreaseCorrectionSlip(player.uniqueId, amount)
+                                sender.sendMessage("${prefix}${ChatColor.GREEN}已减少 $target 补签卡 $amount 张")
+                            } else sender.sendMessage("${prefix}${ChatColor.YELLOW}用法: /$label correction_slip decrease <player> [amount]")
+                        }
+
+                        "clear" -> {
+                            if (args.size >= 3) {
+                                val target = args[2]
+                                val player = plugin.server.getPlayerExact(target) ?: return false
+                                CorrectionSlips.clearCorrectionSlip(player.uniqueId)
+                                sender.sendMessage("${prefix}${ChatColor.GREEN}已清除 $target 的补签卡")
+                            } else sender.sendMessage("${prefix}${ChatColor.YELLOW}用法: /$label correction_slip clear <player>")
+                        }
+
+                        else -> sender.sendMessage("${prefix}${ChatColor.YELLOW}子命令: give|decrease|clear")
+                    }
+                } else sender.sendMessage("${prefix}${ChatColor.YELLOW}用法: /$label correction_slip <give|decrease|clear> ...")
             }
+
             "make_up" -> {
                 if (!sender.hasPermission("signinplus.make_up")) {
                     sender.sendMessage("${prefix}${ChatColor.RED}你没有权限执行此命令！")
                     return true
                 }
-                if (plugin.storage !is cc.vastsea.storage.SqliteStorage) {
-                    sender.sendMessage("${prefix}${ChatColor.RED}当前存储不支持补签操作")
-                    return true
-                }
 
-                val s = plugin.storage as cc.vastsea.storage.SqliteStorage
                 val isAdmin = sender.hasPermission("signinplus.admin")
 
                 // Parsing for: /make_up [cards] [player] [force]
@@ -252,15 +269,16 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     return true
                 }
 
+                val player = plugin.server.getPlayerExact(target) ?: return false
                 val finalForce = force || isAdmin
-                val (madeUpDates, refundedCards) = s.makeUpSign(target, cards, finalForce)
+                val (madeUpDates, refundedCards) = Checkins.makeUpSign(player.uniqueId, cards, finalForce)
 
                 val today = java.time.LocalDate.now()
                 val signedInToday = madeUpDates.contains(today)
 
                 if (signedInToday) {
                     // Temporarily remove today's sign-in to correctly calculate streak and trigger rewards
-                    s.getSignedDates(target).toMutableList().remove(today)
+                    Checkins.getSignedDates(player.uniqueId).toMutableList().remove(today)
                 }
 
                 if (madeUpDates.isNotEmpty()) {
@@ -282,31 +300,28 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                         sender.sendMessage("${prefix}${ChatColor.GREEN}没有可补签的，已为您今日签到。")
                     }
 
-                    plugin.rewardExecutor.onSignedIn(target)
+                    plugin.rewardExecutor.onSignedIn(player.uniqueId)
 
                     if (signedInToday) {
                         // Add today's sign-in back after rewards have been processed
-                        s.getSignedDates(target).toMutableList().add(today)
+                        Checkins.getSignedDates(player.uniqueId).toMutableList().add(today)
                     }
 
-                    val totalDays = s.getSignedDates(target).size
+                    val totalDays = Checkins.getSignedDates(player.uniqueId).size
                     sender.sendMessage("${prefix}${ChatColor.GREEN}当前累计签到天数: $totalDays")
                 } else {
                     sender.sendMessage("${prefix}${ChatColor.YELLOW}没有可补签的天数或补签卡不足。")
                 }
             }
+
             "top" -> {
-                if (plugin.storage is cc.vastsea.storage.SqliteStorage) {
-                    val s = (plugin.storage as cc.vastsea.storage.SqliteStorage)
                     val mode = if (args.size >= 2) args[1].lowercase() else "total"
                     when (mode) {
-                        "streak" -> showTop(sender, "连续签到天数前十：", s.topStreak(10))
-                        else -> showTop(sender, "总天数排行前十：", s.topTotal(10))
+                        "streak" -> showTop(sender, "连续签到天数前十：", Checkins.topStreak(10))
+                        else -> showTop(sender, "总天数排行前十：", Checkins.topTotal(10))
                     }
-                } else {
-                    sender.sendMessage("${prefix}${ChatColor.RED}当前存储不支持排行操作")
-                }
             }
+
             "debug" -> {
                 if (!sender.hasPermission("signinplus.admin")) {
                     sender.sendMessage("${prefix}${ChatColor.RED}You do not have permission to use this command.")
@@ -325,6 +340,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     else -> sender.sendMessage("${prefix}${ChatColor.YELLOW}Unknown debug command. Usage: /$label debug trigger <type> [value]")
                 }
             }
+
             else -> {
                 sender.sendMessage("${prefix}${ChatColor.YELLOW}未知子命令，使用 /$label help 查看帮助")
             }
@@ -332,10 +348,10 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
         return true
     }
 
-    private fun showTop(sender: CommandSender, title: String, ranked: List<Pair<String, Int>>) {
+    private fun showTop(sender: CommandSender, title: String, ranked: List<Pair<UUID, Int>>) {
         sender.sendMessage("${prefix}$title")
         for (i in 0 until 10) {
-            val line = ranked.getOrNull(i)?.let { "${i+1}. ${it.first} - ${it.second}" } ?: "${i+1}. -"
+            val line = ranked.getOrNull(i)?.let { "${i + 1}. ${it.first} - ${it.second}" } ?: "${i + 1}. -"
             sender.sendMessage(line)
         }
     }
@@ -364,7 +380,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
 
         val type = args[0].lowercase()
         val value = args.getOrNull(1)
-        val player = if (sender is org.bukkit.entity.Player) sender else null
+        val player = if (sender is Player) sender else null
 
         if (player == null) {
             sender.sendMessage("${prefix}${ChatColor.RED}This command can only be run by a player.")
@@ -374,7 +390,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
         sender.sendMessage("${prefix}${ChatColor.GREEN}Triggering debug reward for type '$type'...")
 
         when (type) {
-            "default" -> plugin.rewardExecutor.runDefaultRewards(player.name)
+            "default" -> plugin.rewardExecutor.runDefaultRewards(player.uniqueId)
             "cumulative" -> {
                 val days = value?.toIntOrNull()
                 if (days == null) {
@@ -383,11 +399,18 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                 }
                 val validDays = plugin.config.getMapList("cumulative").mapNotNull { it["times"]?.toString() }
                 if (days.toString() !in validDays) {
-                    sender.sendMessage("${prefix}${ChatColor.RED}Invalid days value. Available options: ${validDays.joinToString(" | ")}")
+                    sender.sendMessage(
+                        "${prefix}${ChatColor.RED}Invalid days value. Available options: ${
+                            validDays.joinToString(
+                                " | "
+                            )
+                        }"
+                    )
                     return
                 }
-                plugin.rewardExecutor.runCumulativeRewards(days, player.name, true)
+                plugin.rewardExecutor.runCumulativeRewards(days, player.uniqueId, true)
             }
+
             "streak" -> {
                 val days = value?.toIntOrNull()
                 if (days == null) {
@@ -396,40 +419,63 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                 }
                 val validDays = plugin.config.getMapList("streak").mapNotNull { it["times"]?.toString() }
                 if (days.toString() !in validDays) {
-                    sender.sendMessage("${prefix}${ChatColor.RED}Invalid days value. Available options: ${validDays.joinToString(" | ")}")
+                    sender.sendMessage(
+                        "${prefix}${ChatColor.RED}Invalid days value. Available options: ${
+                            validDays.joinToString(
+                                " | "
+                            )
+                        }"
+                    )
                     return
                 }
-                plugin.rewardExecutor.runStreakRewards(days, player.name, true)
+                plugin.rewardExecutor.runStreakRewards(days, player.uniqueId, true)
             }
+
             "top" -> {
                 val rank = value?.toIntOrNull()
                 if (rank == null) {
-                    val ranks = plugin.config.getMapList("top").mapNotNull { it["rank"]?.toString() }.joinToString(" | ")
+                    val ranks =
+                        plugin.config.getMapList("top").mapNotNull { it["rank"]?.toString() }.joinToString(" | ")
                     sender.sendMessage("${prefix}${ChatColor.YELLOW}Usage: /signinplus debug trigger top <rank>")
                     sender.sendMessage("${prefix}${ChatColor.GRAY}Available ranks: $ranks")
                     return
                 }
                 val validRanks = plugin.config.getMapList("top").mapNotNull { it["rank"]?.toString() }
                 if (rank.toString() !in validRanks) {
-                    sender.sendMessage("${prefix}${ChatColor.RED}Invalid rank value. Available options: ${validRanks.joinToString(" | ")}")
+                    sender.sendMessage(
+                        "${prefix}${ChatColor.RED}Invalid rank value. Available options: ${
+                            validRanks.joinToString(
+                                " | "
+                            )
+                        }"
+                    )
                     return
                 }
-                plugin.rewardExecutor.runTopRewards(rank, player.name, true)
+                plugin.rewardExecutor.runTopRewards(rank, player.uniqueId, true)
             }
+
             "special_dates" -> {
                 if (value == null) {
-                    val dates = plugin.config.getMapList("special_dates").mapNotNull { it["date"]?.toString() }.joinToString(" | ")
+                    val dates = plugin.config.getMapList("special_dates").mapNotNull { it["date"]?.toString() }
+                        .joinToString(" | ")
                     sender.sendMessage("${prefix}${ChatColor.YELLOW}Usage: /signinplus debug trigger special_dates <date>")
                     sender.sendMessage("${prefix}${ChatColor.GRAY}Available dates: $dates")
                     return
                 }
                 val validDates = plugin.config.getMapList("special_dates").mapNotNull { it["date"]?.toString() }
                 if (value !in validDates) {
-                    sender.sendMessage("${prefix}${ChatColor.RED}Invalid date value. Available options: ${validDates.joinToString(" | ")}")
+                    sender.sendMessage(
+                        "${prefix}${ChatColor.RED}Invalid date value. Available options: ${
+                            validDates.joinToString(
+                                " | "
+                            )
+                        }"
+                    )
                     return
                 }
-                plugin.rewardExecutor.runSpecialDateRewards(value, player.name)
+                plugin.rewardExecutor.runSpecialDateRewards(value, player.uniqueId)
             }
+
             else -> {
                 sender.sendMessage("${prefix}${ChatColor.YELLOW}Unknown trigger type: $type")
                 return
@@ -439,24 +485,50 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
         sender.sendMessage("${prefix}${ChatColor.GREEN}Debug trigger for '$type' executed for ${player.name}.")
     }
 
-    override fun onTabComplete(sender: CommandSender, command: Command, alias: String, args: Array<out String>): MutableList<String> {
+    override fun onTabComplete(
+        sender: CommandSender,
+        command: Command,
+        alias: String,
+        args: Array<out String>
+    ): MutableList<String> {
         val out = mutableListOf<String>()
         if (args.size == 1) {
-            val base = listOf("help", "reload", "force_check_in", "status", "make_up", "correction_slip", "points", "top", "debug")
+            val base = listOf(
+                "help",
+                "reload",
+                "force_check_in",
+                "status",
+                "make_up",
+                "correction_slip",
+                "points",
+                "top",
+                "debug"
+            )
             out.addAll(base.filter { it.startsWith(args[0], ignoreCase = true) })
             return out
         }
 
         when (args[0].lowercase()) {
             "top" -> {
-                if (args.size == 2) out.addAll(listOf("total", "streak").filter { it.startsWith(args[1], ignoreCase = true) })
+                if (args.size == 2) out.addAll(listOf("total", "streak").filter {
+                    it.startsWith(
+                        args[1],
+                        ignoreCase = true
+                    )
+                })
             }
+
             "debug" -> {
                 if (args.size == 2) {
                     out.addAll(listOf("trigger").filter { it.startsWith(args[1], ignoreCase = true) })
                 }
                 if (args.size == 3) {
-                    out.addAll(listOf("default", "cumulative", "streak", "top", "special_dates").filter { it.startsWith(args[2], ignoreCase = true) })
+                    out.addAll(listOf("default", "cumulative", "streak", "top", "special_dates").filter {
+                        it.startsWith(
+                            args[2],
+                            ignoreCase = true
+                        )
+                    })
                 }
                 if (args.size == 4) {
                     when (args[2].lowercase()) {
@@ -464,14 +536,17 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                             val ranks = plugin.config.getMapList("top").mapNotNull { it["rank"]?.toString() }
                             out.addAll(ranks.filter { it.startsWith(args[3], ignoreCase = true) })
                         }
+
                         "special_dates" -> {
                             val dates = plugin.config.getMapList("special_dates").mapNotNull { it["date"]?.toString() }
                             out.addAll(dates.filter { it.startsWith(args[3], ignoreCase = true) })
                         }
+
                         "cumulative" -> {
                             val times = plugin.config.getMapList("cumulative").mapNotNull { it["times"]?.toString() }
                             out.addAll(times.filter { it.startsWith(args[3], ignoreCase = true) })
                         }
+
                         "streak" -> {
                             val times = plugin.config.getMapList("streak").mapNotNull { it["times"]?.toString() }
                             out.addAll(times.filter { it.startsWith(args[3], ignoreCase = true) })
@@ -479,6 +554,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     }
                 }
             }
+
             "points" -> {
                 if (args.size == 2) {
                     val subs = listOf("set", "decrease", "clear")
@@ -486,22 +562,41 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     out.addAll(onlinePlayerNames().filter { it.startsWith(args[1], ignoreCase = true) })
                 } else if (args.size == 3) {
                     when (args[1].lowercase()) {
-                        "set", "decrease" -> out.addAll(onlinePlayerNames().filter { it.startsWith(args[2], ignoreCase = true) })
+                        "set", "decrease" -> out.addAll(onlinePlayerNames().filter {
+                            it.startsWith(
+                                args[2],
+                                ignoreCase = true
+                            )
+                        })
+
                         "clear" -> out.addAll(onlinePlayerNames().filter { it.startsWith(args[2], ignoreCase = true) })
                     }
                 } else if (args.size == 4) {
                     when (args[1].lowercase()) {
-                        "set", "decrease" -> out.addAll(suggestNumbers().filter { it.startsWith(args[3], ignoreCase = true) })
+                        "set", "decrease" -> out.addAll(suggestNumbers().filter {
+                            it.startsWith(
+                                args[3],
+                                ignoreCase = true
+                            )
+                        })
                     }
                 }
             }
+
             "correction_slip" -> {
                 when (args.size) {
-                    2 -> out.addAll(listOf("give", "decrease", "clear").filter { it.startsWith(args[1], ignoreCase = true) })
+                    2 -> out.addAll(listOf("give", "decrease", "clear").filter {
+                        it.startsWith(
+                            args[1],
+                            ignoreCase = true
+                        )
+                    })
+
                     3 -> out.addAll(onlinePlayerNames().filter { it.startsWith(args[2], ignoreCase = true) })
                     4 -> out.addAll(suggestNumbers().filter { it.startsWith(args[3], ignoreCase = true) })
                 }
             }
+
             "make_up" -> {
                 when (args.size) {
                     2 -> out.addAll(suggestNumbers().filter { it.startsWith(args[1], ignoreCase = true) })
@@ -509,6 +604,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                         out.addAll(onlinePlayerNames().filter { it.startsWith(args[2], ignoreCase = true) })
                         out.add("force")
                     }
+
                     4 -> {
                         if (args[2].equals("force", ignoreCase = true)) {
                             // No suggestions after force
@@ -518,6 +614,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     }
                 }
             }
+
             "force_check_in" -> {
                 if (args.size == 2) out.addAll(onlinePlayerNames().filter { it.startsWith(args[1], ignoreCase = true) })
             }

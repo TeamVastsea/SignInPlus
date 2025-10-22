@@ -10,15 +10,14 @@
 # - 默认 sqlite (无需额外配置) 
 # - 使用 mysql 或 postgresql 时需填写以下信息 
 ######################################################### 
-storage: 
-  type: sqlite # 默认 sqlite，可改为 mysql 或 postgresql 
-  # host: localhost 
-  # port: 5432 
-  # database: mydatabase 
-  # username: myuser 
-  # password: mypassword 
-  # sslmode: disable # postgresql 特有参数，可设为 disable/enable 
-
+database:
+  # sqlite: vast_pay.db / postgresql: localhost:5432/vast_pay / mysql: localhost:3306/vast_pay
+  url: localhost:5432/your_database
+  # sqlite / postgresql / mysql
+  type: sqlite
+  # sqlite: You can leave username and password empty
+  username: vastPay
+  password: vastPay
 ######################################################### 
 # 默认签到奖励 
 # 玩家签到后触发的动作，支持多种动作类型： 

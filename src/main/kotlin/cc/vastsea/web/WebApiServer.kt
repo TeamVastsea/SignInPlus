@@ -1,16 +1,18 @@
 package cc.vastsea.web
 
-import cc.vastsea.SignInPlus
+import cc.vastsea.storage.Checkins
+import cc.vastsea.storage.PlayerStat
+import cc.vastsea.storage.Points
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpHandler
 import com.sun.net.httpserver.HttpServer
+import org.bukkit.Bukkit
 import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.URI
 import java.nio.charset.StandardCharsets
 
 class WebApiServer(
-    private val plugin: SignInPlus,
     private val address: String,
     private val port: Int,
     private val basePath: String,
@@ -22,52 +24,59 @@ class WebApiServer(
         server = HttpServer.create(addr, 0)
         val s = server ?: return
         s.createContext(path("/ifsignin"), handler { q ->
-            val p = q.param("player")
-            val v = p?.let { plugin.storage.isSignedIn(it) } ?: false
+            val pName = q.param("player") ?: run { badRequest(q, "missing player"); return@handler }
+            val player = Bukkit.getOfflinePlayer(pName)
+            val v = Checkins.isSignedIn(player.uniqueId)
             okText(q, v.toString())
         })
         s.createContext(path("/total"), handler { q ->
-            val p = q.param("player")
-            val v = p?.let { plugin.storage.getTotalDays(it) } ?: 0
+            val pName = q.param("player") ?: run { badRequest(q, "missing player"); return@handler }
+            val player = Bukkit.getOfflinePlayer(pName)
+            val v = Checkins.getTotalDays(player.uniqueId)
             okText(q, v.toString())
         })
         s.createContext(path("/streak"), handler { q ->
-            val p = q.param("player")
-            val v = p?.let { plugin.storage.getStreakDays(it) } ?: 0
+            val pName = q.param("player") ?: run { badRequest(q, "missing player"); return@handler }
+            val player = Bukkit.getOfflinePlayer(pName)
+            val v = Checkins.getStreakDays(player.uniqueId)
             okText(q, v.toString())
         })
         s.createContext(path("/last_check_in_time"), handler { q ->
-            val p = q.param("player")
-            val v = p?.let { plugin.storage.getLastCheckInTime(it) } ?: "未签到"
+            val pName = q.param("player") ?: run { badRequest(q, "missing player"); return@handler }
+            val player = Bukkit.getOfflinePlayer(pName)
+            val v = Checkins.getLastCheckInTime(player.uniqueId)
             okText(q, v)
         })
         s.createContext(path("/ranktoday"), handler { q ->
-            val p = q.param("player")
-            val v = p?.let { plugin.storage.getRankToday(it) } ?: "未签到"
+            val pName = q.param("player") ?: run { badRequest(q, "missing player"); return@handler }
+            val player = Bukkit.getOfflinePlayer(pName)
+            val v = Checkins.getRankToday(player.uniqueId)
             okText(q, v)
         })
         s.createContext(path("/points"), handler { q ->
-            val p = q.param("player")
-            val raw = p?.let { plugin.storage.getPoints(it) } ?: 0.0
+            val pName = q.param("player") ?: run { badRequest(q, "missing player"); return@handler }
+            val player = Bukkit.getOfflinePlayer(pName)
+            val raw = Points.getPoints(player.uniqueId)
             val display = String.format("%.2f", raw / 100.0)
             okText(q, display)
         })
         s.createContext(path("/info"), handler { q ->
-            val p = q.param("player") ?: run { badRequest(q, "missing player") ; return@handler }
-            val i = plugin.storage.getInfo(p)
+            val pName = q.param("player") ?: run { badRequest(q, "missing player"); return@handler }
+            val player = Bukkit.getOfflinePlayer(pName)
+            val i = PlayerStat(player.uniqueId)
             val json = "{" +
-                "\"name\":\"${i.name}\"," +
-                "\"total\":${i.totalDays}," +
-                "\"streak\":${i.streakDays}," +
-                "\"last_check_in_time\":\"${i.lastCheckInTime}\"," +
-                "\"rank_today\":\"${i.rankToday}\"," +
-                // 统一显示为两位小数
-                "\"points\":${String.format("%.2f", i.points / 100.0)}" +
-            "}"
+                    "\"name\":\"${pName}\"," +
+                    "\"total\":${i.totalDays}," +
+                    "\"streak\":${i.streakDays}," +
+                    "\"last_check_in_time\":\"${i.lastCheckInTime}\"," +
+                    "\"rank_today\":\"${i.rankToday}\"," +
+                    // 统一显示为两位小数
+                    "\"points\":${String.format("%.2f", i.points / 100.0)}" +
+                    "}"
             okJson(q, json)
         })
         s.createContext(path("/amounttoday"), handler { q ->
-            val v = plugin.storage.getAmountToday()
+            val v = Checkins.getAmountToday()
             okText(q, v.toString())
         })
 
@@ -104,6 +113,7 @@ class WebApiServer(
                 if (i > 0) it.substring(0, i) to it.substring(i + 1) else null
             }.toMap()[key]
         }
+
         fun exchange(): HttpExchange = ex
     }
 
