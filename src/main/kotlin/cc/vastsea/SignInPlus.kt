@@ -86,9 +86,9 @@ class SignInPlus : JavaPlugin() {
         val enabled = web?.getBoolean("enable_web_api") ?: false
         if (!enabled) return
 
-        val address = web.getString("web_api_address") ?: "0.0.0.0"
-        val port = web.getInt("web_api_port")
-        val endpoint = web.getString("web_api_endpoint") ?: "/api"
+        val address = web?.getString("web_api_address") ?: "0.0.0.0"
+        val port = web?.getInt("web_api_port") ?: 7999
+        val endpoint = web?.getString("web_api_endpoint") ?: "/api"
 
         webServer = WebApiServer(address, port, endpoint)
         webServer?.start()
