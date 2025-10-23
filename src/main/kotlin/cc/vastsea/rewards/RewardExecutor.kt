@@ -23,6 +23,10 @@ class RewardExecutor(private val plugin: SignInPlus) {
     private val actionsRunner = ActionsRunner(plugin, prefix)
     private val isDebug = plugin.config.getBoolean("debug", false)
 
+    private fun playerLabel(id: UUID): String {
+        val name = plugin.server.getPlayer(id)?.name ?: plugin.server.getOfflinePlayer(id)?.name ?: "未知玩家"
+        return "&b$name&7(&e$id&7)"
+    }
     private fun colorizeForConsole(message: String): String {
         val colorMap = mapOf(
             "&0" to "\u001B[0;30m", // Black
@@ -55,7 +59,7 @@ class RewardExecutor(private val plugin: SignInPlus) {
     }
 
     fun onSignedIn(player: UUID) {
-        logDebug("Processing sign-in for player: &b$player")
+        logDebug("Processing sign-in for player: ${playerLabel(player)}")
         // 默认奖励
         runActionsFromConfig("default.actions", player)
 
@@ -112,16 +116,16 @@ class RewardExecutor(private val plugin: SignInPlus) {
                 val limit = if (repeatEnabled) repeatTime.coerceAtLeast(1) else 1
                 val currentTimes = SpecialDateClaims.getTimes(player, date)
                 if (currentTimes >= limit) {
-                    logDebug("Special date '&a$date&r' reached limit for &b$player&r (&c$currentTimes/$limit&r), skipping.")
+                    logDebug("Special date '&a$date&r' reached limit for ${playerLabel(player)} (&c$currentTimes/$limit&r), skipping.")
                     continue
                 }
                 // 允许一次领取，并累计次数
-                logDebug("Granting special date '&a$date&r' to &b$player&r (count &a${currentTimes + 1}/$limit&r). Actions: &c${actions.joinToString(", ")}")
+                logDebug("Granting special date '&a$date&r' to ${playerLabel(player)} (count &a${currentTimes + 1}/$limit&r). Actions: &c${actions.joinToString(", ")}")
                 runActionLines(actions, player)
                 SpecialDateClaims.increment(player, date)
             } else {
                 // 精确日期仅当天一次，不需要次数限制
-                logDebug("Granting special date '&a$date&r' to &b$player&r (exact date). Actions: &c${actions.joinToString(", ")}")
+                logDebug("Granting special date '&a$date&r' to ${playerLabel(player)} (exact date). Actions: &c${actions.joinToString(", ")}")
                 runActionLines(actions, player)
             }
         }
@@ -138,7 +142,7 @@ class RewardExecutor(private val plugin: SignInPlus) {
             ?: list.find { it.containsKey("enable") }?.get("enable") as? Boolean
             ?: false
         if (!enabled && !force) return
-        logDebug("Checking cumulative rewards for &b$player &r(Total Days: &a$totalDays&r)")
+        logDebug("Checking cumulative rewards for ${playerLabel(player)} &r(Total Days: &a$totalDays&r)")
         val eligible = list.filter { it.containsKey("times") }
             .mapNotNull { m ->
                 val threshold = m["times"] as? Int ?: return@mapNotNull null
@@ -146,7 +150,7 @@ class RewardExecutor(private val plugin: SignInPlus) {
             }
         eligible.forEach { (threshold, rewardMap) ->
             val actions = (rewardMap["actions"] as? List<*>) ?: emptyList<Any>()
-            logDebug("Granting cumulative reward for &a$threshold &rdays to &b$player&r. Actions: &c${actions.joinToString(", ")}")
+            logDebug("Granting cumulative reward for &a$threshold &rdays to ${playerLabel(player)}. Actions: &c${actions.joinToString(", ")}")
             runActionLines(actions, player)
             if (!force) {
                 ClaimedRewards.markClaimedTotalReward(player, threshold)
@@ -178,7 +182,7 @@ class RewardExecutor(private val plugin: SignInPlus) {
             ?: list.find { it.containsKey("enable") }?.get("enable") as? Boolean
             ?: false
         if (!enabled && !force) return
-        logDebug("Checking streak rewards for &b$player &r(Streak: &a$streakDays &rdays)")
+        logDebug("Checking streak rewards for ${playerLabel(player)} &r(Streak: &a$streakDays &rdays)")
         val eligible = list.filter { it.containsKey("times") }
             .mapNotNull { m ->
                 val threshold = m["times"] as? Int ?: return@mapNotNull null
@@ -186,7 +190,7 @@ class RewardExecutor(private val plugin: SignInPlus) {
             }
         eligible.forEach { (threshold, rewardMap) ->
             val actions = (rewardMap["actions"] as? List<*>) ?: emptyList<Any>()
-            logDebug("Granting streak reward for &a$threshold &rdays to &b$player&r. Actions: &c${actions.joinToString(", ")}")
+            logDebug("Granting streak reward for &a$threshold &rdays to ${playerLabel(player)}. Actions: &c${actions.joinToString(", ")}")
             runActionLines(actions, player)
             if (!force) {
                 ClaimedRewards.markClaimedStreakReward(player, threshold)
@@ -201,12 +205,12 @@ class RewardExecutor(private val plugin: SignInPlus) {
             ?: list.find { it.containsKey("enable") }?.get("enable") as? Boolean
             ?: false
         if (!enabled && !force) return
-        logDebug("Checking top rewards for &b$player &r(Rank: &a$rank&r)")
+        logDebug("Checking top rewards for ${playerLabel(player)} &r(Rank: &a$rank&r)")
         for (m in list) {
             val r = m["rank"] as? Int ?: continue
             if (rank == r) {
                 val actions = m["actions"] as? List<*> ?: continue
-                logDebug("Granting top reward for rank &a$rank &rto &b$player&r. Actions: &c${actions.joinToString(", ")}")
+                logDebug("Granting top reward for rank &a$rank &rto ${playerLabel(player)}. Actions: &c${actions.joinToString(", ")}")
                 runActionLines(actions, player)
                 break
             }
@@ -242,14 +246,14 @@ class RewardExecutor(private val plugin: SignInPlus) {
                 val limit = if (repeatEnabled) repeatTime.coerceAtLeast(1) else 1
                 val prev = simulatedPrevTimes ?: 0
                 if (prev >= limit) {
-                    logDebug("[Debug] Special date '&a$date&r' reached limit for &b$player&r (&c$prev/$limit&r), skipping.")
+                    logDebug("[Debug] Special date '&a$date&r' reached limit for ${playerLabel(player)} (&c$prev/$limit&r), skipping.")
                     continue
                 }
-                logDebug("[Debug] Granting special date '&a$date&r' to &b$player&r (count &a${prev + 1}/$limit&r). Actions: &c${actions.joinToString(", ")}")
+                logDebug("[Debug] Granting special date '&a$date&r' to ${playerLabel(player)} (count &a${prev + 1}/$limit&r). Actions: &c${actions.joinToString(", ")}")
                 runActionLines(actions, player)
                 // Debug: 不记录或修改数据库中的特殊日期次数
             } else {
-                logDebug("[Debug] Granting special date '&a$date&r' to &b$player&r (exact date). Actions: &c${actions.joinToString(", ")}")
+                logDebug("[Debug] Granting special date '&a$date&r' to ${playerLabel(player)} (exact date). Actions: &c${actions.joinToString(", ")}")
                 runActionLines(actions, player)
             }
         }
@@ -258,7 +262,7 @@ class RewardExecutor(private val plugin: SignInPlus) {
     private fun runActionsFromConfig(path: String, player: UUID) {
         val actions = plugin.config.getStringList(path)
         if (actions.isEmpty()) return
-        logDebug("Running actions from config path '&a$path&r' for player &b$player&r. Actions: &c${actions.joinToString(", ")}")
+        logDebug("Running actions from config path '&a$path&r' for player ${playerLabel(player)}. Actions: &c${actions.joinToString(", ")}")
         actionsRunner.runActionLines(actions, player)
     }
 
