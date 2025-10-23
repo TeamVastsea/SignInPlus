@@ -477,7 +477,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                 // 校验 previous_day：仅当该规则 repeat=true 时接受；范围必须在 1..repeat_time
                 val entry = plugin.config.getMapList("special_dates").find { (it["date"] as? String)?.equals(value, true) == true }
                 val repeatEnabled = (entry?.get("repeat") as? Boolean) ?: false
-                val limit = ((entry?.get("repeat_time") as? Number)?.toInt() ?: 1).coerceAtLeast(1)
+                val limit = ((entry?.get("repeat_time") as? Number)?.toInt() ?: 1).coerceAtLeast(0)
 
                 val prevArg = args.getOrNull(2)
                 if (prevArg != null) {
@@ -587,7 +587,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     val entry = plugin.config.getMapList("special_dates").find { (it["date"] as? String)?.equals(chosenDate, true) == true }
                     val repeatEnabled = (entry?.get("repeat") as? Boolean) ?: false
                     if (repeatEnabled) {
-                        val limit = ((entry?.get("repeat_time") as? Number)?.toInt() ?: 1).coerceAtLeast(1)
+                        val limit = ((entry?.get("repeat_time") as? Number)?.toInt() ?: 1).coerceAtLeast(0)
                         val options = (0..limit).map { it.toString() }
                         out.addAll(options.filter { it.startsWith(args[4], ignoreCase = true) })
                     }
