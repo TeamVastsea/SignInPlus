@@ -77,22 +77,35 @@ class RewardExecutor(private val plugin: SignInPlus) {
 
         // 特殊日期奖励
         val specials = plugin.config.getMapList("special_dates")
-        val now = java.time.LocalDate.now()
+        val zone = java.time.ZoneId.of(plugin.config.getString("timezone") ?: "Asia/Shanghai")
+        val now = java.time.LocalDate.now(zone)
+        val dow = now.dayOfWeek.name // e.g. THURSDAY
+        val mdFmt = java.time.format.DateTimeFormatter.ofPattern("MM-dd")
+        val yyyyMmFmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-")
+
         for (m in specials) {
             val date = m["date"] as? String ?: continue
             val actions = m["actions"] as? List<*> ?: continue
-            val repeat = m["repeat"] as? String ?: "1"
-            val repeatTime = repeat.toIntOrNull() ?: 1
+            val repeatEnabled = (m["repeat"] as? Boolean) ?: false
+            val repeatTime = if (repeatEnabled) ((m["repeat_time"] as? Number)?.toInt() ?: 1) else 1
 
             val match = when {
-                date.startsWith("*-MM-dd") -> date.substring(1) == now.format(java.time.format.DateTimeFormatter.ofPattern("-MM-dd"))
-                date.startsWith("yyyy-MM-*") -> date.substring(0, 8) == now.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-"))
-                else -> date == now.toString()
+                // 每年的某一天: *-MM-dd
+                date.matches(Regex("\\*-\\d{2}-\\d{2}")) -> date.substring(2) == now.format(mdFmt)
+                // 每月的某一天: *-*-dd
+                date.matches(Regex("\\*-\\*-\\d{2}")) -> date.substring(4) == String.format("%02d", now.dayOfMonth)
+                // 星期几: Monday..Sunday (大小写不敏感)
+                date.equals("Monday", true) || date.equals("Tuesday", true) || date.equals("Wednesday", true) ||
+                        date.equals("Thursday", true) || date.equals("Friday", true) || date.equals("Saturday", true) ||
+                        date.equals("Sunday", true) -> dow.equals(date.uppercase(), true)
+                // 精确日期 yyyy-MM-dd
+                date.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) -> date == now.toString()
+                else -> false
             }
 
             if (match) {
                 if (isDebug) {
-                    plugin.logger.info("[Debug] Matched special date '$date' for player $player. Repeating $repeatTime time(s).")
+                    plugin.logger.info("[Debug] Matched special date '$date' for player $player. Repeating $repeatTime time(s). Actions: ${actions.joinToString(", ")}")
                 }
                 repeat(repeatTime.coerceAtLeast(1)) {
                     runActionLines(actions, player)
@@ -189,26 +202,29 @@ class RewardExecutor(private val plugin: SignInPlus) {
 
     fun runSpecialDateRewards(dateStr: String, player: UUID) {
         val specials = plugin.config.getMapList("special_dates")
-        val targetDate = try {
-            java.time.LocalDate.parse(dateStr)
-        } catch (e: java.time.format.DateTimeParseException) {
-            logDebug("&cInvalid date format for special date trigger: $dateStr")
-            return
-        }
+        val zone = java.time.ZoneId.of(plugin.config.getString("timezone") ?: "Asia/Shanghai")
+        val today = java.time.LocalDate.now(zone)
+        val mdFmt = java.time.format.DateTimeFormatter.ofPattern("MM-dd")
 
+        val isExact = dateStr.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))
+        val isYearly = dateStr.matches(Regex("\\*-\\d{2}-\\d{2}"))
+        val isMonthly = dateStr.matches(Regex("\\*-\\*-\\d{2}"))
+        val isWeekday = listOf("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday").any { it.equals(dateStr, true) }
+
+        // debug 模式：如果传入的是配置里的模式（如 *-*-14 或 Thursday），直接触发与该模式相同的条目，而不校验今天是否匹配
         for (m in specials) {
             val date = m["date"] as? String ?: continue
             val actions = m["actions"] as? List<*> ?: continue
-            val repeat = m["repeat"] as? String ?: "1"
-            val repeatTime = repeat.toIntOrNull() ?: 1
+            val repeatEnabled = (m["repeat"] as? Boolean) ?: false
+            val repeatTime = if (repeatEnabled) ((m["repeat_time"] as? Number)?.toInt() ?: 1) else 1
 
-            val match = when {
-                date.startsWith("*-MM-dd") -> date.substring(1) == targetDate.format(java.time.format.DateTimeFormatter.ofPattern("-MM-dd"))
-                date.startsWith("yyyy-MM-*") -> date.substring(0, 8) == targetDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-"))
-                else -> date == targetDate.toString()
+            val shouldRun = when {
+                isExact -> date == dateStr // 精确日期按照目标日期匹配
+                isYearly || isMonthly || isWeekday -> date.equals(dateStr, true) // 模式/星期：按配置项字符串精确匹配
+                else -> false
             }
 
-            if (match) {
+            if (shouldRun) {
                 logDebug("Matched special date '&a$date&r' for player &b$player&r. Repeating &a$repeatTime &rtime(s). Actions: &c${actions.joinToString(", ")}")
                 repeat(repeatTime.coerceAtLeast(1)) {
                     runActionLines(actions, player)
