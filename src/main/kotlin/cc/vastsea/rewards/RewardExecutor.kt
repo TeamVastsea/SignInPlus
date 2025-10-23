@@ -4,6 +4,7 @@ import cc.vastsea.SignInPlus
 import cc.vastsea.storage.Checkins
 import cc.vastsea.storage.ClaimedRewards
 import cc.vastsea.storage.Points
+import cc.vastsea.storage.SpecialDateClaims
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.ChatColor
@@ -81,7 +82,6 @@ class RewardExecutor(private val plugin: SignInPlus) {
         val now = java.time.LocalDate.now(zone)
         val dow = now.dayOfWeek.name // e.g. THURSDAY
         val mdFmt = java.time.format.DateTimeFormatter.ofPattern("MM-dd")
-        val yyyyMmFmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-")
 
         for (m in specials) {
             val date = m["date"] as? String ?: continue
@@ -89,27 +89,40 @@ class RewardExecutor(private val plugin: SignInPlus) {
             val repeatEnabled = (m["repeat"] as? Boolean) ?: false
             val repeatTime = if (repeatEnabled) ((m["repeat_time"] as? Number)?.toInt() ?: 1) else 1
 
+            val isExact = date.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))
+            val isYearly = date.matches(Regex("\\*-\\d{2}-\\d{2}"))
+            val isMonthly = date.matches(Regex("\\*-\\*-\\d{2}"))
+            val isWeekday = listOf("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday").any { it.equals(date, true) }
+
             val match = when {
                 // 每年的某一天: *-MM-dd
-                date.matches(Regex("\\*-\\d{2}-\\d{2}")) -> date.substring(2) == now.format(mdFmt)
+                isYearly -> date.substring(2) == now.format(mdFmt)
                 // 每月的某一天: *-*-dd
-                date.matches(Regex("\\*-\\*-\\d{2}")) -> date.substring(4) == String.format("%02d", now.dayOfMonth)
+                isMonthly -> date.substring(4) == String.format("%02d", now.dayOfMonth)
                 // 星期几: Monday..Sunday (大小写不敏感)
-                date.equals("Monday", true) || date.equals("Tuesday", true) || date.equals("Wednesday", true) ||
-                        date.equals("Thursday", true) || date.equals("Friday", true) || date.equals("Saturday", true) ||
-                        date.equals("Sunday", true) -> dow.equals(date.uppercase(), true)
+                isWeekday -> dow.equals(date.uppercase(), true)
                 // 精确日期 yyyy-MM-dd
-                date.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) -> date == now.toString()
+                isExact -> date == now.toString()
                 else -> false
             }
 
-            if (match) {
-                if (isDebug) {
-                    plugin.logger.info("[Debug] Matched special date '$date' for player $player. Repeating $repeatTime time(s). Actions: ${actions.joinToString(", ")}")
+            if (!match) continue
+
+            if (!isExact) {
+                val limit = if (repeatEnabled) repeatTime.coerceAtLeast(1) else 1
+                val currentTimes = SpecialDateClaims.getTimes(player, date)
+                if (currentTimes >= limit) {
+                    logDebug("Special date '&a$date&r' reached limit for &b$player&r (&c$currentTimes/$limit&r), skipping.")
+                    continue
                 }
-                repeat(repeatTime.coerceAtLeast(1)) {
-                    runActionLines(actions, player)
-                }
+                // 允许一次领取，并累计次数
+                logDebug("Granting special date '&a$date&r' to &b$player&r (count &a${currentTimes + 1}/$limit&r). Actions: &c${actions.joinToString(", ")}")
+                runActionLines(actions, player)
+                SpecialDateClaims.increment(player, date)
+            } else {
+                // 精确日期仅当天一次，不需要次数限制
+                logDebug("Granting special date '&a$date&r' to &b$player&r (exact date). Actions: &c${actions.joinToString(", ")}")
+                runActionLines(actions, player)
             }
         }
     }
@@ -200,18 +213,18 @@ class RewardExecutor(private val plugin: SignInPlus) {
         }
     }
 
-    fun runSpecialDateRewards(dateStr: String, player: UUID) {
+    fun runSpecialDateRewards(dateStr: String, player: UUID, simulatedPrevTimes: Int? = null) {
         val specials = plugin.config.getMapList("special_dates")
         val zone = java.time.ZoneId.of(plugin.config.getString("timezone") ?: "Asia/Shanghai")
         val today = java.time.LocalDate.now(zone)
         val mdFmt = java.time.format.DateTimeFormatter.ofPattern("MM-dd")
 
-        val isExact = dateStr.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))
-        val isYearly = dateStr.matches(Regex("\\*-\\d{2}-\\d{2}"))
-        val isMonthly = dateStr.matches(Regex("\\*-\\*-\\d{2}"))
-        val isWeekday = listOf("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday").any { it.equals(dateStr, true) }
+        val isExactInput = dateStr.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))
+        val isYearlyInput = dateStr.matches(Regex("\\*-\\d{2}-\\d{2}"))
+        val isMonthlyInput = dateStr.matches(Regex("\\*-\\*-\\d{2}"))
+        val isWeekdayInput = listOf("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday").any { it.equals(dateStr, true) }
 
-        // debug 模式：如果传入的是配置里的模式（如 *-*-14 或 Thursday），直接触发与该模式相同的条目，而不校验今天是否匹配
+        // debug 模式：如果传入的是配置里的模式（如 *-*-14 或 Thursday），直接匹配相同配置项，不校验今天
         for (m in specials) {
             val date = m["date"] as? String ?: continue
             val actions = m["actions"] as? List<*> ?: continue
@@ -219,16 +232,28 @@ class RewardExecutor(private val plugin: SignInPlus) {
             val repeatTime = if (repeatEnabled) ((m["repeat_time"] as? Number)?.toInt() ?: 1) else 1
 
             val shouldRun = when {
-                isExact -> date == dateStr // 精确日期按照目标日期匹配
-                isYearly || isMonthly || isWeekday -> date.equals(dateStr, true) // 模式/星期：按配置项字符串精确匹配
+                isExactInput -> date == dateStr // 精确日期按照目标日期匹配
+                isYearlyInput || isMonthlyInput || isWeekdayInput -> date.equals(dateStr, true) // 模式/星期：字符串精确匹配
                 else -> false
             }
+            if (!shouldRun) continue
 
-            if (shouldRun) {
-                logDebug("Matched special date '&a$date&r' for player &b$player&r. Repeating &a$repeatTime &rtime(s). Actions: &c${actions.joinToString(", ")}")
-                repeat(repeatTime.coerceAtLeast(1)) {
-                    runActionLines(actions, player)
+            val isExactCfg = date.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))
+            val isPatternCfg = !isExactCfg
+
+            if (isPatternCfg) {
+                val limit = if (repeatEnabled) repeatTime.coerceAtLeast(1) else 1
+                val prev = simulatedPrevTimes ?: 0
+                if (prev >= limit) {
+                    logDebug("[Debug] Special date '&a$date&r' reached limit for &b$player&r (&c$prev/$limit&r), skipping.")
+                    continue
                 }
+                logDebug("[Debug] Granting special date '&a$date&r' to &b$player&r (count &a${prev + 1}/$limit&r). Actions: &c${actions.joinToString(", ")}")
+                runActionLines(actions, player)
+                // Debug: 不记录或修改数据库中的特殊日期次数
+            } else {
+                logDebug("[Debug] Granting special date '&a$date&r' to &b$player&r (exact date). Actions: &c${actions.joinToString(", ")}")
+                runActionLines(actions, player)
             }
         }
     }

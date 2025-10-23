@@ -458,7 +458,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                 if (value == null) {
                     val dates = plugin.config.getMapList("special_dates").mapNotNull { it["date"]?.toString() }
                         .joinToString(" | ")
-                    sender.sendMessage("${prefix}${ChatColor.YELLOW}Usage: /signinplus debug trigger special_dates <date>")
+                    sender.sendMessage("${prefix}${ChatColor.YELLOW}Usage: /signinplus debug trigger special_dates <date> [previous_day]")
                     sender.sendMessage("${prefix}${ChatColor.GRAY}Available dates: $dates")
                     return
                 }
@@ -473,7 +473,35 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     )
                     return
                 }
-                plugin.rewardExecutor.runSpecialDateRewards(value, player.uniqueId)
+
+                // 校验 previous_day：仅当该规则 repeat=true 时接受；范围必须在 1..repeat_time
+                val entry = plugin.config.getMapList("special_dates").find { (it["date"] as? String)?.equals(value, true) == true }
+                val repeatEnabled = (entry?.get("repeat") as? Boolean) ?: false
+                val limit = ((entry?.get("repeat_time") as? Number)?.toInt() ?: 1).coerceAtLeast(1)
+
+                val prevArg = args.getOrNull(2)
+                if (prevArg != null) {
+                    if (!repeatEnabled) {
+                        sender.sendMessage("${prefix}${ChatColor.RED}Repeat is disabled for this rule; previous_day is not accepted.")
+                        return
+                    }
+                    val prev = prevArg.toIntOrNull()
+                    if (prev == null) {
+                        sender.sendMessage("${prefix}${ChatColor.YELLOW}Usage: /signinplus debug trigger special_dates <date> [previous_day]")
+                        sender.sendMessage("${prefix}${ChatColor.GRAY}previous_day must be an integer. Allowed range: 0..$limit")
+                        return
+                    }
+                    if (prev < 0 || prev > limit) {
+                        sender.sendMessage("${prefix}${ChatColor.RED}Invalid previous_day: $prev. Allowed range: 0..$limit")
+                        return
+                    }
+                    plugin.rewardExecutor.runSpecialDateRewards(value, player.uniqueId, prev)
+                    sender.sendMessage("${prefix}${ChatColor.GREEN}Debug trigger for 'special_dates' executed for ${player.name}.")
+                    return
+                }
+
+                // 未提供 previous_day，则按首次领取状态（模拟之前为0次）
+                plugin.rewardExecutor.runSpecialDateRewards(value, player.uniqueId, null)
             }
 
             else -> {
@@ -551,6 +579,17 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                             val times = plugin.config.getMapList("streak").mapNotNull { it["times"]?.toString() }
                             out.addAll(times.filter { it.startsWith(args[3], ignoreCase = true) })
                         }
+                    }
+                }
+                // Provide the optional [previous_day] only when repeat=true on the chosen special date
+                if (args.size == 5 && args[2].equals("special_dates", ignoreCase = true)) {
+                    val chosenDate = args[3]
+                    val entry = plugin.config.getMapList("special_dates").find { (it["date"] as? String)?.equals(chosenDate, true) == true }
+                    val repeatEnabled = (entry?.get("repeat") as? Boolean) ?: false
+                    if (repeatEnabled) {
+                        val limit = ((entry?.get("repeat_time") as? Number)?.toInt() ?: 1).coerceAtLeast(1)
+                        val options = (0..limit).map { it.toString() }
+                        out.addAll(options.filter { it.startsWith(args[4], ignoreCase = true) })
                     }
                 }
             }

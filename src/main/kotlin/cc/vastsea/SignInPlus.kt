@@ -21,7 +21,7 @@ class SignInPlus : JavaPlugin() {
         // 初始化存储
         val tz = config.getString("timezone") ?: "Asia/Shanghai"
         zoneId = ZoneId.of(tz)
-        transaction(DatabaseHelper.database) { create(Checkins, ClaimedRewards, CorrectionSlips, PluginMeta, Points) }
+        transaction(DatabaseHelper.database) { create(Checkins, ClaimedRewards, CorrectionSlips, PluginMeta, Points, SpecialDateClaims) }
         PluginMeta.initFirstLaunchDay()
 
         // 奖励执行器
