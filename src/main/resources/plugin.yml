@@ -5,6 +5,7 @@ api: paper
 api-version: '1.20'
 authors:
   - Snowball_233
+  - zrll_
 description: 现代化的多功能签到插件
 depend:
   - Kotlin

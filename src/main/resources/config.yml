@@ -4,20 +4,28 @@
 # 注意: 修改后请使用 /signinplus reload 重载配置 
 ######################################################### 
 
-######################################################### 
-# 数据存储配置 
-# 可选数据库: sqlite, mysql, postgresql 
-# - 默认 sqlite (无需额外配置) 
-# - 使用 mysql 或 postgresql 时需填写以下信息 
-######################################################### 
+#########################################################
+# 数据存储配置
+# 说明
+# - 可选: sqlite / mysql / postgresql
+# - 键名: database.type / database.url / database.username / database.password
+# URL 格式
+# - sqlite: signinplus.db
+# - postgresql: 127.0.0.1:5432/signinplus?sslmode=disable
+# - mysql: 127.0.0.1:3306/signinplus
+# 自动创建
+# - sqlite: 若文件不存在，自动创建 plugins/SignInPlus/signinplus.db
+# - mysql/postgresql: 若库不存在，尝试创建数据库 signinplus（需账户具备建库权限）
+# 示例
+# - postgresql: type=postgresql, url=127.0.0.1:5432/signinplus?sslmode=disable, username=local_pg, password=...
+#########################################################
+
 database:
-  # sqlite: vast_pay.db / postgresql: localhost:5432/vast_pay / mysql: localhost:3306/vast_pay
-  url: localhost:5432/your_database
-  # sqlite / postgresql / mysql
   type: sqlite
-  # sqlite: You can leave username and password empty
-  username: vastPay
-  password: vastPay
+  url: signinplus.db
+  username: 
+  password: 
+
 ######################################################### 
 # 默认签到奖励 
 # 玩家签到后触发的动作，支持多种动作类型： 

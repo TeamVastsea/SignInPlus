@@ -20,7 +20,6 @@ CREATE TABLE IF NOT EXISTS claimed_rewards (
     UNIQUE(player, type, times)
 );
 */
-
 object ClaimedRewards : Table() {
     val player = uuid("player")
     val type = enumeration("type", ClaimedType::class)
