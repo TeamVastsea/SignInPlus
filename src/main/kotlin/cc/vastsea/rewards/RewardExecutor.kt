@@ -7,7 +7,7 @@ import cc.vastsea.storage.Points
 import cc.vastsea.storage.SpecialDateClaims
 import org.bukkit.Bukkit
 import org.bukkit.Material
-import org.bukkit.ChatColor
+
 import org.bukkit.Sound
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
@@ -18,7 +18,7 @@ import java.util.UUID
 import kotlin.random.Random
 
 class RewardExecutor(private val plugin: SignInPlus) {
-    private val prefix = ChatColor.translateAlternateColorCodes('&', plugin.config.getString("message_prefix") ?: "&7[&a签到Plus&7] ")
+    private val prefix = (plugin.config.getString("message_prefix") ?: "&7[&a签到Plus&7] ").replace('&', '§')
     private val isDebug = plugin.config.getBoolean("debug", false)
 
     private fun colorizeForConsole(message: String): String {
@@ -215,9 +215,6 @@ class RewardExecutor(private val plugin: SignInPlus) {
 
     fun runSpecialDateRewards(dateStr: String, player: UUID, simulatedPrevTimes: Int? = null) {
         val specials = plugin.config.getMapList("special_dates")
-        val zone = java.time.ZoneId.of(plugin.config.getString("timezone") ?: "Asia/Shanghai")
-        val today = java.time.LocalDate.now(zone)
-        val mdFmt = java.time.format.DateTimeFormatter.ofPattern("MM-dd")
 
         val isExactInput = dateStr.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))
         val isYearlyInput = dateStr.matches(Regex("\\*-\\d{2}-\\d{2}"))
@@ -348,20 +345,20 @@ class RewardExecutor(private val plugin: SignInPlus) {
 
         when {
             action.startsWith("[COMMAND]") -> {
-                val cmd = action.substringAfter("[COMMAND]").trim().replace("%player_name%", player?.displayName ?: "")
+                val cmd = action.substringAfter("[COMMAND]").trim().replace("%player_name%", player?.name ?: "")
                 server.dispatchCommand(server.consoleSender, cmd)
             }
             action.startsWith("[MESSAGE]") -> {
-                player?.sendMessage(prefix + ChatColor.translateAlternateColorCodes('&', action.substringAfter("[MESSAGE]").trim()))
+                player?.sendMessage(prefix + action.substringAfter("[MESSAGE]").trim().replace('&', '§'))
             }
             action.startsWith("[TITLE]") -> {
                 val parts = action.substringAfter("[TITLE]").trim().split("|", limit = 2)
-                val title = ChatColor.translateAlternateColorCodes('&', parts.getOrNull(0) ?: "")
-                val sub = ChatColor.translateAlternateColorCodes('&', parts.getOrNull(1) ?: "")
+                val title = (parts.getOrNull(0) ?: "").replace('&', '§')
+                val sub = (parts.getOrNull(1) ?: "").replace('&', '§')
                 player?.sendTitle(title, sub, 10, 60, 10)
             }
             action.startsWith("[BROADCAST]") -> {
-                val msg = ChatColor.translateAlternateColorCodes('&', action.substringAfter("[BROADCAST]").trim().replace("%player_name%", player?.displayName ?:""))
+                val msg = action.substringAfter("[BROADCAST]").trim().replace("%player_name%", player?.name ?: "").replace('&', '§')
                 server.broadcastMessage(prefix + msg)
             }
             action.startsWith("[SOUND]") -> {
