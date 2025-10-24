@@ -189,7 +189,7 @@ class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) 
         return when {
             fmt == null -> value.toDouble()
             fmt == "z" -> kotlin.math.round(value).toDouble()
-            fmt?.endsWith("f") == true -> String.format("%.${fmt.dropLast(1)}f", value).toDouble()
+            fmt.endsWith("f") -> String.format("%.${fmt.dropLast(1)}f", value).toDouble()
             else -> value.toDouble()
         }
     }
