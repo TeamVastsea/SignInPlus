@@ -8,7 +8,7 @@ import org.bukkit.OfflinePlayer
 class SignInPlusExpansion(private val plugin: SignInPlus) : PlaceholderExpansion() {
     override fun getIdentifier(): String = "signinplus"
     override fun getAuthor(): String = "Snowball_233, zrll_"
-    override fun getVersion(): String = plugin.pluginMeta.version
+    override fun getVersion(): String = plugin.description.version
 
     override fun onRequest(player: OfflinePlayer?, params: String): String? {
         val baseName = player?.name ?: return ""

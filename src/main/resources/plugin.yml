@@ -1,7 +1,6 @@
 name: SignInPlus
 main: cc.vastsea.SignInPlus
 version: ${version}
-api: paper
 api-version: '1.20'
 authors:
   - Snowball_233
