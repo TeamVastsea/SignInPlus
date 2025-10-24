@@ -23,30 +23,23 @@ class SignInPlusExpansion(private val plugin: JavaPlugin) : PlaceholderExpansion
             if (lower.startsWith("${base}_")) return lower.substring(base.length + 1)
             return null
         }
-        fun matchWithOptionalNameMulti(vararg bases: String): String? {
-            for (b in bases) {
-                val r = matchWithOptionalName(b)
-                if (r != null) return r
-            }
-            return null
-        }
 
-        // 全局今日签到人数（无玩家上下文）
-        if (lower == "amount_today" || lower == "check_in_amount_today") {
+        // 今日总签到人数（无玩家上下文）
+        if (lower == "amount_today") {
             return Checkins.getAmountToday().toString()
         }
 
-        // 签到状态（支持别名：check_in_status）
-        matchWithOptionalNameMulti("status", "check_in_status")?.let { targetName ->
+        // 今日签到状态（仅保留新键）
+        matchWithOptionalName("status")?.let { targetName ->
             val target = Bukkit.getOfflinePlayer(targetName)
             val uuid = target.uniqueId
             return if (Checkins.isSignedIn(uuid)) "&a已签到" else "&c未签到"
         }
 
-        // 其他键：total_days, streak_days, last_check_in_time, rank_today, points（及旧前缀别名）
+        // 玩家相关键（不再支持旧前缀）：total_days, streak_days, last_check_in_time, rank_today, points
         val keys = listOf("total_days", "streak_days", "last_check_in_time", "rank_today", "points")
         for (key in keys) {
-            matchWithOptionalNameMulti(key, "check_in_${key}")?.let { targetName ->
+            matchWithOptionalName(key)?.let { targetName ->
                 val target = Bukkit.getOfflinePlayer(targetName)
                 val uuid = target.uniqueId
                 return when (key) {
@@ -60,8 +53,8 @@ class SignInPlusExpansion(private val plugin: JavaPlugin) : PlaceholderExpansion
             }
         }
 
-        // 补签卡数量：新键 corr，兼容旧键 check_in_correction_slip_amount
-        matchWithOptionalNameMulti("corr", "check_in_correction_slip_amount")?.let { targetName ->
+        // 补签卡数量（仅保留新键 corr）
+        matchWithOptionalName("corr")?.let { targetName ->
             val target = Bukkit.getOfflinePlayer(targetName)
             val uuid = target.uniqueId
             return CorrectionSlips.getCorrectionSlipAmount(uuid).toString()
