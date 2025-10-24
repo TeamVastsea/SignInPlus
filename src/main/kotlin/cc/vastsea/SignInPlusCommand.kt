@@ -171,6 +171,27 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                         } else sender.sendMessage("${prefix}§e用法: /$label points decrease <player> <amount>")
                     }
 
+                    "add" -> {
+                        if (!sender.hasPermission("signinplus.admin")) {
+                            sender.sendMessage("${prefix}§c你没有权限执行此命令！")
+                            return true
+                        }
+                        if (args.size >= 4) {
+                            val target = args[2]
+                            val amount = args[3].toDoubleOrNull()
+                            if (amount == null) {
+                                sender.sendMessage("${prefix}§c积分必须是数字，例如 1 或 1.25")
+                            } else {
+                                val cents = kotlin.math.round(amount * 100.0)
+                                val player = plugin.server.getPlayerExact(target) ?: return false
+                                Points.addPoints(player.uniqueId, cents)
+                                sender.sendMessage(
+                                    "${prefix}§a已增加 $target 的积分 ${String.format("%.2f", amount)}"
+                                )
+                            }
+                        } else sender.sendMessage("${prefix}§e用法: /$label points add <player> <amount>")
+                    }
+
                     else -> {
                         // 兼容：/points <player> 查看某人积分
                         val target = args[1]
@@ -556,12 +577,12 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
 
              "points" -> {
                  if (args.size == 2) {
-                     val subs = listOf("set", "decrease", "clear")
+                     val subs = listOf("set", "decrease", "clear", "add")
                      out.addAll(subs.filter { it.startsWith(args[1], ignoreCase = true) })
                      out.addAll(onlinePlayerNames().filter { it.startsWith(args[1], ignoreCase = true) })
                  } else if (args.size == 3) {
                      when (args[1].lowercase()) {
-                         "set", "decrease" -> out.addAll(onlinePlayerNames().filter {
+                         "set", "decrease", "add" -> out.addAll(onlinePlayerNames().filter {
                              it.startsWith(
                                  args[2],
                                  ignoreCase = true
@@ -572,7 +593,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                      }
                  } else if (args.size == 4) {
                      when (args[1].lowercase()) {
-                         "set", "decrease" -> out.addAll(suggestNumbers().filter {
+                         "set", "decrease", "add" -> out.addAll(suggestNumbers().filter {
                              it.startsWith(
                                  args[3],
                                  ignoreCase = true
