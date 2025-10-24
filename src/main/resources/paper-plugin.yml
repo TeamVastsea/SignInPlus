@@ -1,0 +1,20 @@
+name: SignInPlus
+version: ${version}
+main: cc.vastsea.SignInPlus
+api-version: "1.20"
+load: POSTWORLD
+
+# Paper will download these libraries at runtime for the plugin
+# to significantly reduce the plugin JAR size.
+libraries:
+  - org.xerial:sqlite-jdbc:3.46.0.0
+  - org.jetbrains.exposed:exposed-core:0.58.0
+  - org.jetbrains.exposed:exposed-jdbc:0.58.0
+  - org.jetbrains.exposed:exposed-java-time:0.58.0
+  - com.zaxxer:HikariCP:6.2.1
+
+# Keep existing dependencies from plugin.yml
+softdepend:
+  - PlaceholderAPI
+depend:
+  - Kotlin
