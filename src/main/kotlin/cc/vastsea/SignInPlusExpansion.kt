@@ -7,8 +7,8 @@ import org.bukkit.OfflinePlayer
 
 class SignInPlusExpansion(private val plugin: SignInPlus) : PlaceholderExpansion() {
     override fun getIdentifier(): String = "signinplus"
-    override fun getAuthor(): String = "zrll_, Snowball_233"
-    override fun getVersion(): String = plugin.description.version
+    override fun getAuthor(): String = "Snowball_233, zrll_"
+    override fun getVersion(): String = plugin.pluginMeta.version
 
     override fun onRequest(player: OfflinePlayer?, params: String): String? {
         val baseName = player?.name ?: return ""
@@ -29,8 +29,8 @@ class SignInPlusExpansion(private val plugin: SignInPlus) : PlaceholderExpansion
 
         // 状态占位符（无后缀时默认当前玩家）
         matchWithOptionalName("check_in_status")?.let { target ->
-            val player = plugin.server.getPlayerExact(target) ?: return "&c玩家未在线"
-            return if (Checkins.isSignedIn(player.uniqueId)) "&a已签到" else "&c未签到"
+            val targetPlayer = plugin.server.getPlayerExact(target) ?: return "&c玩家未在线"
+            return if (Checkins.isSignedIn(targetPlayer.uniqueId)) "&a已签到" else "&c未签到"
         }
 
         // 支持带玩家名的占位符：total_days / streak_days / correction_slip_amount / last_check_in时间 / rank_today / points
@@ -46,8 +46,8 @@ class SignInPlusExpansion(private val plugin: SignInPlus) : PlaceholderExpansion
 
         for (key in keys) {
             matchWithOptionalName(key)?.let { target ->
-                val player = plugin.server.getPlayerExact(target) ?: return "&c玩家未在线"
-                val p: PlayerStat = PlayerStat(player.uniqueId)
+                val targetPlayer = plugin.server.getPlayerExact(target) ?: return "&c玩家未在线"
+                val p: PlayerStat = PlayerStat(targetPlayer.uniqueId)
                 return when (key) {
                     "check_in_total_days" -> p.totalDays.toString()
                     "check_in_streak_days" -> p.streakDays.toString()
@@ -61,8 +61,8 @@ class SignInPlusExpansion(private val plugin: SignInPlus) : PlaceholderExpansion
         }
 
         matchWithOptionalName(correctionKey)?.let { target ->
-            val player = plugin.server.getPlayerExact(target) ?: return "&c玩家未在线"
-            val p: PlayerStat = PlayerStat(player.uniqueId)
+            val targetPlayer = plugin.server.getPlayerExact(target) ?: return "&c玩家未在线"
+            val p: PlayerStat = PlayerStat(targetPlayer.uniqueId)
             return p.correctionSlipAmount.toString()
         }
 

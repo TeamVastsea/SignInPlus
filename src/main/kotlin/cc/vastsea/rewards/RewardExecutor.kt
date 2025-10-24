@@ -24,7 +24,7 @@ class RewardExecutor(private val plugin: SignInPlus) {
     private val isDebug = plugin.config.getBoolean("debug", false)
 
     private fun playerLabel(id: UUID): String {
-        val name = plugin.server.getPlayer(id)?.name ?: plugin.server.getOfflinePlayer(id)?.name ?: "未知玩家"
+        val name = plugin.server.getPlayer(id)?.name ?: plugin.server.getOfflinePlayer(id).name ?: "未知玩家"
         return "&b$name&7(&e$id&7)"
     }
     private fun colorizeForConsole(message: String): String {
