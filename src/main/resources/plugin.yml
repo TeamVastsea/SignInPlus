@@ -1,6 +1,7 @@
 name: SignInPlus
 main: cc.vastsea.SignInPlus
 version: ${version}
+api: spigot
 api-version: '1.20'
 authors:
   - Snowball_233
