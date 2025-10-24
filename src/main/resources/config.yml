@@ -65,7 +65,7 @@ default:
     - '[ITEM] GOLDEN_APPLE 1 {"display":{"Name":"{\"text\":\"生命金苹果\",\"color\":\"gold\",\"italic\":false}","Lore":["{\"text\":\"一个特殊的苹果！\",\"color\":\"yellow\"}"]}}'
     # 3. ✅ 复杂 NBT (书): 给予一本有标题、作者和内容的成书
     - '[ITEM] WRITTEN_BOOK 1 {title:"我的故事",author:"史蒂夫",pages:["{\"text\":\"第一页的内容。\"}","{\"text\":\"第二页更加精彩！\"}"]}'
-    # 4. ⚠️ 非法 NBT: 尝试给予一个带有错误 NBT 的石头。预期结果：玩家收到一个普通的石头，并在聊天框收到“物品NBT解析失败”的提示。
+    # 4. ⚠️ 非法 NBT: 尝试给予一个带有错误 NBT 的石头。预期结果：玩家收到一个普通的石头，并在控制台收到“Item NBT parsing failed”的提示。
     - "[ITEM] STONE 1 {invalid_nbt:true"
     # 5. ⚠️ 强制模式修复: 给予一个 NBT 缺少了首尾大括号的铁锭。预期结果：通过 force=true 自动修复，玩家成功收到名为“强制修复的铁锭”的物品。
     - '[ITEM] IRON_INGOT 1 "display":{"Name":"{\"text\":\"强制修复的铁锭\"}"} force=true'

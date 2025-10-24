@@ -167,11 +167,13 @@ class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) 
             processedNbt = "{${processedNbt.removeSurrounding("{", "}").trim()}}"
         }
 
-        runCatching {
+        try {
             Bukkit.getUnsafe().modifyItemStack(stack, processedNbt)
-        }.onFailure { e ->
-            val errorMessage = prefix + "Failed to parse item NBT: ${e.cause?.message ?: e.message}"
-            player?.sendMessage(errorMessage)
+        } catch (e: Exception) {
+            val reason = e.cause?.message ?: e.message
+            val errorMessage = "Failed to parse item NBT for player ${player?.name}. NBT: '$processedNbt'. Reason: $reason"
+            plugin.logger.warning(errorMessage)
+            player?.sendMessage(prefix + "Item NBT parsing failed, see console for details.")
         }
     }
 
@@ -182,15 +184,29 @@ class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) 
         val value = if (range.contains("..")) {
             val a = range.substringBefore("..").toDoubleOrNull() ?: 0.0
             val b = range.substringAfter("..").toDoubleOrNull() ?: a
-            val x = a + Random.nextDouble() * (b - a)
-            x
+            a + Random.nextDouble() * (b - a)
         } else range.toDoubleOrNull() ?: 0.0
 
-        return when {
-            fmt == null -> value.toDouble()
-            fmt == "z" -> kotlin.math.round(value).toDouble()
-            fmt.endsWith("f") -> String.format("%.${fmt.dropLast(1)}f", value).toDouble()
-            else -> value.toDouble()
+        return try {
+            when {
+                fmt == null -> value
+                fmt == "z" -> kotlin.math.round(value)
+                fmt.startsWith(".") && fmt.endsWith("f") -> {
+                    val precisionStr = fmt.substring(1, fmt.length - 1)
+                    val precision = precisionStr.toIntOrNull()
+                    if (precision != null) {
+                        val finalPrecision = precision.coerceAtMost(2)
+                        String.format("%.${finalPrecision}f", value).toDouble()
+                    } else {
+                        plugin.logger.warning("Invalid precision format in points spec: '$spec'. Using raw value.")
+                        value
+                    }
+                }
+                else -> value
+            }
+        } catch (e: Exception) {
+            plugin.logger.warning("Failed to parse points value from spec: '$spec'. Error: ${e.message}")
+            value
         }
     }
 }

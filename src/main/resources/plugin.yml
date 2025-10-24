@@ -14,7 +14,7 @@ softdepend:
   - PlaceholderAPI
 commands:
   signinplus:
-    aliases: [sip, signin, checkin]
+    aliases: [sip, signin, checkin, qd, qiandao]
     description: Main command for SignInPlus
     usage: /signinplus help
 permissions:
