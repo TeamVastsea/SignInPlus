@@ -6,22 +6,24 @@ api-version: '1.20'
 authors:
   - Snowball_233
   - zrll_
-description: 现代化的多功能签到插件
+description: >
+  A modern, full-featured check-in system for Spigot servers: daily sign-ins, streak and total tracking, make-up cards, top rankings, points economy, PlaceholderAPI placeholders, optional Web API, and rich configurable rewards.
 depend:
   - Kotlin
+softdepend:
   - PlaceholderAPI
 commands:
   signinplus:
-    aliases: [sip, signin, checkin, qd, qiandao]
-    description: 签到插件主命令
+    aliases: [sip, signin, checkin]
+    description: Main command for SignInPlus
     usage: /signinplus help
 permissions:
   signinplus.user:
-    description: 可以签到（玩家默认权限）
+    description: Can use sign-in features (default for players)
     default: true
   signinplus.make_up:
-    description: 可以补签（玩家默认权限）
+    description: Can use make-up sign (default for players)
     default: true
   signinplus.admin:
-    description: 管理签到系统（强制默认签到、补签、reload）
+    description: Administer the sign-in system (force check-in, make-up for others, reload)
     default: op
