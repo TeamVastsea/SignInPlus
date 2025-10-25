@@ -1,6 +1,7 @@
 package cc.vastsea
 
 import cc.vastsea.storage.*
+import cc.vastsea.locale.Localization
 import cc.vastsea.web.WebApiServer
 import org.bukkit.plugin.java.JavaPlugin
 import org.jetbrains.exposed.sql.SchemaUtils.create
@@ -18,6 +19,11 @@ class SignInPlus : JavaPlugin() {
         saveDefaultConfig()
         instance = this
 
+        // 初始化本地化 (从 config.yml 中读取 "locale"，默认 en_US)
+        localization = Localization(instance)
+        val locale = config.getString("locale") ?: "en_US"
+        localization.load(locale)
+
         // 初始化存储
         val tz = config.getString("timezone") ?: "Asia/Shanghai"
         zoneId = ZoneId.of(tz)
@@ -28,14 +34,8 @@ class SignInPlus : JavaPlugin() {
         rewardExecutor = cc.vastsea.rewards.RewardExecutor(this)
 
         // 注册命令
-        val cmd = getCommand("signinplus")
-        if (cmd != null) {
-            val executor = SignInPlusCommand(this)
-            cmd.setExecutor(executor)
-            cmd.tabCompleter = executor
-        } else {
-            logger.warning("未找到命令: /signinplus")
-        }
+        getCommand("signinplus")?.setExecutor(SignInPlusCommand(this))
+        getCommand("signinplus")?.tabCompleter = SignInPlusCommand(this)
 
         // 登录自动签到监听器
         server.pluginManager.registerEvents(cc.vastsea.listeners.LoginAutoCheckInListener(this), this)
@@ -65,6 +65,9 @@ class SignInPlus : JavaPlugin() {
 
     fun reloadAll() {
         reloadConfig()
+        // 重新加载本地化（以便管理员修改 data-folder 下的 lang 文件或更改 config.locale）
+        val newLocale = config.getString("locale") ?: localization.locale
+        localization.load(newLocale)
         // 重新创建奖励执行器，应用最新配置（如消息前缀、奖励表）
         rewardExecutor = cc.vastsea.rewards.RewardExecutor(this)
 
@@ -86,9 +89,9 @@ class SignInPlus : JavaPlugin() {
         val enabled = web?.getBoolean("enable_web_api") ?: false
         if (!enabled) return
 
-        val address = web?.getString("web_api_address") ?: "0.0.0.0"
-        val port = web?.getInt("web_api_port") ?: 7999
-        val endpoint = web?.getString("web_api_endpoint") ?: "/api"
+        val address = web.getString("web_api_address") ?: "0.0.0.0"
+        val port = web.getInt("web_api_port")
+        val endpoint = web.getString("web_api_endpoint") ?: "/api"
 
         webServer = WebApiServer(address, port, endpoint)
         webServer?.start()
@@ -100,6 +103,9 @@ class SignInPlus : JavaPlugin() {
             private set
 
         lateinit var zoneId: ZoneId
+            private set
+
+        lateinit var localization: Localization
             private set
 
         fun today(): LocalDate = LocalDate.now(zoneId)

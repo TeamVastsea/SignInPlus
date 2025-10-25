@@ -16,6 +16,10 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
     private val prefix
         get() = (plugin.config.getString("message_prefix") ?: "&7[&a签到Plus&7] ").replace('&', '§')
 
+    private fun loc(key: String, placeholders: Map<String, String>? = null): String {
+        return SignInPlus.localization.get(key, placeholders)
+    }
+
     private fun onlinePlayerNames(): List<String> = plugin.server.onlinePlayers.map { it.name }
     private fun suggestNumbers(): List<String> = listOf("1", "2", "3", "5", "10")
     private fun formatPointsDisplay(raw: Double): String = String.format("%.2f", raw / 100.0)
@@ -25,16 +29,16 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             val alias = label.lowercase()
             if (alias in listOf("signin", "checkin", "qiandao", "qd") && sender is Player) {
                 if (!sender.hasPermission("signinplus.user")) {
-                    sender.sendMessage("${prefix}§c你没有权限执行此命令！")
+                    sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                     return true
                 }
 
                 if (Checkins.isSignedIn(sender.uniqueId)) {
-                    sender.sendMessage("${prefix}§e你今天已经签到过了！")
+                    sender.sendMessage("$prefix§e${loc("commands.already_signed_in")}")
                 } else {
                     Checkins.signInToday(sender.uniqueId)
                     plugin.rewardExecutor.onSignedIn(sender.uniqueId)
-                    sender.sendMessage("${prefix}§a签到成功！")
+                    sender.sendMessage("$prefix§a${loc("commands.sign_in_success")}")
                 }
                 return true
             }
@@ -45,23 +49,23 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
         when (args[0].lowercase()) {
             "force_check_in" -> {
                 if (!sender.hasPermission("signinplus.admin")) {
-                    sender.sendMessage("${prefix}§c你没有权限执行此命令！")
+                    sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                     return true
                 }
                 if (args.size != 2) {
-                    sender.sendMessage("${prefix}§e用法: /$label force_check_in <player>")
+                    sender.sendMessage("$prefix${loc("commands.force_check_in.usage", mapOf("label" to label))}")
                     return true
                 }
                 val target = args[1]
                 val player = plugin.server.getPlayerExact(target) ?: return false
                 Checkins.signInToday(player.uniqueId)
                 plugin.rewardExecutor.onSignedIn(player.uniqueId)
-                sender.sendMessage("${prefix}§a已为 $target 强制签到今日")
+                sender.sendMessage("$prefix§a${loc("commands.force_check_in.success", mapOf("player" to target))}")
             }
 
             "status" -> {
                 if (!sender.hasPermission("signinplus.user")) {
-                    sender.sendMessage("${prefix}§c你没有权限执行此命令！")
+                    sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                     return true
                 }
                 val targetName = if (args.size > 1) args[1] else sender.name
@@ -73,14 +77,14 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                 val missedDays = Checkins.getMissedDays(player.uniqueId)
                 val correctionSlips = stat.correctionSlipAmount
                 val usableSlips = missedDays.coerceAtMost(correctionSlips)
-
-                sender.sendMessage("${prefix}§b玩家 $targetName 的签到状态")
-                sender.sendMessage("今日签到: ${if (signedToday) "§a已签到" else "§e未签到"}")
-                sender.sendMessage("总签到天数: §6$totalDays")
-                sender.sendMessage("连续签到天数: §6$streakDays")
-                sender.sendMessage("漏签天数: §c$missedDays")
-                sender.sendMessage("剩余补签卡: §6$correctionSlips")
-                sender.sendMessage("当前可使用补签卡: §6$usableSlips")
+                sender.sendMessage("$prefix§b${loc("commands.status.header", mapOf("player" to targetName))}")
+                val todayStatus = if (signedToday) "§a${loc("commands.status.today_yes")}" else "§e${loc("commands.status.today_no")}"
+                sender.sendMessage("$prefix${loc("commands.status.today", mapOf("status" to todayStatus))}")
+                sender.sendMessage("$prefix${loc("commands.status.total_days", mapOf("total" to totalDays.toString()))}")
+                sender.sendMessage("$prefix${loc("commands.status.streak_days", mapOf("streak" to streakDays.toString()))}")
+                sender.sendMessage("$prefix${loc("commands.status.missed_days", mapOf("missed" to missedDays.toString()))}")
+                sender.sendMessage("$prefix${loc("commands.status.correction_slips", mapOf("correction" to correctionSlips.toString()))}")
+                sender.sendMessage("$prefix${loc("commands.status.usable_slips", mapOf("usable" to usableSlips.toString()))}")
             }
 
             "help" -> {
@@ -89,17 +93,17 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
 
             "reload" -> {
                 if (!sender.hasPermission("signinplus.admin")) {
-                    sender.sendMessage("${prefix}§c你没有权限执行此命令！")
+                    sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                     return true
                 }
                 plugin.reloadAll()
-                sender.sendMessage("${prefix}§a配置已重载并重启 Web API（如启用）")
+                sender.sendMessage("$prefix§a${loc("commands.config_reloaded")}")
             }
 
             "points" -> {
                 if (args.size == 1 && sender is Player) {
                     val p = Points.getPoints(sender.uniqueId)
-                    sender.sendMessage("${prefix}你的积分: ${formatPointsDisplay(p)}")
+                    sender.sendMessage("$prefix${loc("commands.points.self", mapOf("amount" to formatPointsDisplay(p)))}")
                     return true
                 }
 
@@ -107,7 +111,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                 when (sub) {
                     "set" -> {
                         if (!sender.hasPermission("signinplus.admin")) {
-                            sender.sendMessage("${prefix}§c你没有权限执行此命令！")
+                            sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                             return true
                         }
                         if (args.size >= 4) {
@@ -116,78 +120,62 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                             val player = plugin.server.getPlayerExact(target) ?: return false
 
                             if (amount == null) {
-                                sender.sendMessage("${prefix}§c积分必须是数字，例如 1 或 1.25")
+                                sender.sendMessage("$prefix§c${loc("commands.points.invalid_number")}")
                             } else {
                                 val cents = kotlin.math.round(amount * 100.0).toDouble()
                                 Points.setPoints(player.uniqueId, cents)
-                                sender.sendMessage(
-                                    "${prefix}§a已设置 $target 的积分为 ${
-                                        String.format(
-                                            "%.2f",
-                                            amount
-                                        )
-                                    }"
-                                )
+                                sender.sendMessage("$prefix§a${loc("commands.points.set_success", mapOf("player" to target, "amount" to String.format("%.2f", amount)))}")
                             }
-                        } else sender.sendMessage("${prefix}§e用法: /$label points set <player> <amount>")
+                            } else sender.sendMessage("${prefix}§e用法: /$label points set <player> <amount>")
                     }
 
                     "clear" -> {
                         if (!sender.hasPermission("signinplus.admin")) {
-                            sender.sendMessage("${prefix}§c你没有权限执行此命令！")
+                            sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                             return true
                         }
                         if (args.size >= 3) {
                             val target = args[2]
                             val player = plugin.server.getPlayerExact(target) ?: return false
                             Points.setPoints(player.uniqueId, 0.0)
-                            sender.sendMessage("${prefix}§a已清零 $target 的积分")
+                            sender.sendMessage("$prefix§a${loc("commands.points.clear_success", mapOf("player" to target))}")
                         } else sender.sendMessage("${prefix}§e用法: /$label points clear <player>")
                     }
 
                     "decrease" -> {
                         if (!sender.hasPermission("signinplus.admin")) {
-                            sender.sendMessage("${prefix}§c你没有权限执行此命令！")
+                            sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                             return true
                         }
                         if (args.size >= 4) {
                             val target = args[2]
                             val amount = args[3].toDoubleOrNull()
                             if (amount == null) {
-                                sender.sendMessage("${prefix}§c积分必须是数字，例如 1 或 1.25")
+                                sender.sendMessage("$prefix§c${loc("commands.points.invalid_number")}")
                             } else {
                                 val cents = -kotlin.math.round(amount * 100.0)
                                 val player = plugin.server.getPlayerExact(target) ?: return false
                                 Points.addPoints(player.uniqueId, cents)
-                                sender.sendMessage(
-                                    "${prefix}§a已减少 $target 的积分 ${
-                                        String.format(
-                                            "%.2f",
-                                            amount
-                                        )
-                                    }"
-                                )
+                                sender.sendMessage("$prefix§a${loc("commands.points.decrease_success", mapOf("player" to target, "amount" to String.format("%.2f", amount)))}")
                             }
                         } else sender.sendMessage("${prefix}§e用法: /$label points decrease <player> <amount>")
                     }
 
                     "add" -> {
                         if (!sender.hasPermission("signinplus.admin")) {
-                            sender.sendMessage("${prefix}§c你没有权限执行此命令！")
+                            sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                             return true
                         }
                         if (args.size >= 4) {
                             val target = args[2]
                             val amount = args[3].toDoubleOrNull()
                             if (amount == null) {
-                                sender.sendMessage("${prefix}§c积分必须是数字，例如 1 或 1.25")
+                                sender.sendMessage("$prefix§c${loc("commands.points.invalid_number")}")
                             } else {
                                 val cents = kotlin.math.round(amount * 100.0)
                                 val player = plugin.server.getPlayerExact(target) ?: return false
                                 Points.addPoints(player.uniqueId, cents)
-                                sender.sendMessage(
-                                    "${prefix}§a已增加 $target 的积分 ${String.format("%.2f", amount)}"
-                                )
+                                sender.sendMessage("$prefix§a${loc("commands.points.add_success", mapOf("player" to target, "amount" to String.format("%.2f", amount)))}")
                             }
                         } else sender.sendMessage("${prefix}§e用法: /$label points add <player> <amount>")
                     }
@@ -197,14 +185,14 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                         val target = args[1]
                         val player = plugin.server.getPlayerExact(target) ?: return false
                         val p = Points.getPoints(player.uniqueId)
-                        sender.sendMessage("${prefix}$target 的积分: ${formatPointsDisplay(p)}")
+                        sender.sendMessage("$prefix${loc("commands.points.other", mapOf("player" to target, "amount" to formatPointsDisplay(p)))}")
                     }
                 }
             }
 
             "correction_slip" -> {
                 if (!sender.hasPermission("signinplus.admin")) {
-                    sender.sendMessage("${prefix}§c你没有权限执行此命令！")
+                    sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                     return true
                 }
                 if (args.size == 1 && sender is Player) {
@@ -212,8 +200,8 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     val missedDays = Checkins.getMissedDays(sender.uniqueId)
                     val correctionSlips = stat.correctionSlipAmount
                     val usableSlips = missedDays.coerceAtMost(correctionSlips)
-                    sender.sendMessage("${prefix}剩余补签卡: §6$correctionSlips")
-                    sender.sendMessage("${prefix}当前可使用补签卡: §6$usableSlips")
+                    sender.sendMessage("$prefix${loc("commands.correction_slip.remaining", mapOf("count" to correctionSlips.toString()))}")
+                    sender.sendMessage("$prefix${loc("commands.correction_slip.usable", mapOf("count" to usableSlips.toString()))}")
                     return true
                 }
                 if (args.size >= 2) {
@@ -224,7 +212,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                                 val amount = if (args.size >= 4) args[3].toIntOrNull() ?: 1 else 1
                                 val player = plugin.server.getPlayerExact(target) ?: return false
                                 CorrectionSlips.giveCorrectionSlip(player.uniqueId, amount)
-                                sender.sendMessage("${prefix}§a已给予 $target 补签卡 $amount 张")
+                                sender.sendMessage("$prefix§a${loc("commands.correction_slip.give_success", mapOf("player" to target, "amount" to amount.toString()))}")
                             } else sender.sendMessage("${prefix}§e用法: /$label correction_slip give <player> [amount]")
                         }
 
@@ -234,7 +222,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                                 val amount = if (args.size >= 4) args[3].toIntOrNull() ?: 1 else 1
                                 val player = plugin.server.getPlayerExact(target) ?: return false
                                 CorrectionSlips.decreaseCorrectionSlip(player.uniqueId, amount)
-                                sender.sendMessage("${prefix}§a已减少 $target 补签卡 $amount 张")
+                                sender.sendMessage("$prefix§a${loc("commands.correction_slip.decrease_success", mapOf("player" to target, "amount" to amount.toString()))}")
                             } else sender.sendMessage("${prefix}§e用法: /$label correction_slip decrease <player> [amount]")
                         }
 
@@ -243,18 +231,18 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                                 val target = args[2]
                                 val player = plugin.server.getPlayerExact(target) ?: return false
                                 CorrectionSlips.clearCorrectionSlip(player.uniqueId)
-                                sender.sendMessage("${prefix}§a已清除 $target 的补签卡")
+                                sender.sendMessage("$prefix§a${loc("commands.correction_slip.clear_success", mapOf("player" to target))}")
                             } else sender.sendMessage("${prefix}§e用法: /$label correction_slip clear <player>")
                         }
 
-                        else -> sender.sendMessage("${prefix}§e子命令: give|decrease|clear")
+                        else -> sender.sendMessage("$prefix§e${loc("commands.correction_slip.subcommands")}")
                     }
                 } else sender.sendMessage("${prefix}§e用法: /$label correction_slip <give|decrease|clear> ...")
             }
 
             "make_up" -> {
                 if (!sender.hasPermission("signinplus.make_up")) {
-                    sender.sendMessage("${prefix}§c你没有权限执行此命令！")
+                    sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                     return true
                 }
 
@@ -283,7 +271,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                 }
 
                 if (!isAdmin && target != sender.name) {
-                    sender.sendMessage("${prefix}§c你没有权限为他人补签！")
+                    sender.sendMessage("$prefix§c${loc("commands.make_up.no_permission_for_others")}")
                     return true
                 }
 
@@ -302,20 +290,14 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                 if (madeUpDates.isNotEmpty()) {
                     val pastDaysMadeUp = madeUpDates.filter { it.isBefore(today) }
 
-                    if (pastDaysMadeUp.isNotEmpty()) {
-                        var msg = "${prefix}§a已为您补签 ${pastDaysMadeUp.size} 次"
-                        if (signedInToday) {
-                            msg += "，且为今日签到了。"
-                        } else {
-                            msg += "。"
-                        }
-                        sender.sendMessage(msg)
+                        if (pastDaysMadeUp.isNotEmpty()) {
+                        sender.sendMessage("$prefix§a${loc("commands.make_up.success_made_up", mapOf("count" to pastDaysMadeUp.size.toString()))}")
 
                         if (refundedCards > 0) {
-                            sender.sendMessage("${prefix}§e退回 $refundedCards 张补签卡。")
+                            sender.sendMessage("$prefix§e${loc("commands.make_up.refunded", mapOf("count" to refundedCards.toString()))}")
                         }
                     } else if (signedInToday) {
-                        sender.sendMessage("${prefix}§a没有可补签的，已为您今日签到。")
+                        sender.sendMessage("$prefix§a${loc("commands.make_up.no_past_but_signed_today")}")
                     }
 
                     plugin.rewardExecutor.onSignedIn(player.uniqueId)
@@ -326,31 +308,31 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     }
 
                     val totalDays = Checkins.getSignedDates(player.uniqueId).size
-                    sender.sendMessage("${prefix}§a当前累计签到天数: $totalDays")
+                    sender.sendMessage("$prefix§a${loc("commands.make_up.total_days", mapOf("total" to totalDays.toString()))}")
                 } else {
-                    sender.sendMessage("${prefix}§e没有可补签的天数或补签卡不足。")
+                    sender.sendMessage("$prefix§e${loc("commands.make_up.no_days_or_insufficient_cards")}")
                 }
             }
 
             "top" -> {
                     val mode = if (args.size >= 2) args[1].lowercase() else "total"
                     when (mode) {
-                        "streak" -> showTop(sender, "连续签到天数前十：", Checkins.topStreak(10))
-                        else -> showTop(sender, "总天数排行前十：", Checkins.topTotal(10))
+                        "streak" -> showTop(sender, loc("commands.top.title_streak"), Checkins.topStreak(10))
+                        else -> showTop(sender, loc("commands.top.title_total"), Checkins.topTotal(10))
                     }
             }
 
             "debug" -> {
                 if (!sender.hasPermission("signinplus.admin")) {
-                    sender.sendMessage("${prefix}§cYou do not have permission to use this command.")
+                    sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                     return true
                 }
                 if (!plugin.config.getBoolean("debug", false)) {
-                    sender.sendMessage("${prefix}§cDebug mode is not enabled in config.yml.")
+                    sender.sendMessage("$prefix§c${loc("commands.debug.disabled")}")
                     return true
                 }
                 if (args.size < 2) {
-                    sender.sendMessage("${prefix}§eUsage: /$label debug trigger <type> [value]")
+                    sender.sendMessage("$prefix§e${loc("commands.debug.usage", mapOf("label" to label))}")
                     return true
                 }
                 when (args[1].lowercase()) {
@@ -360,32 +342,37 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             }
 
             else -> {
-                sender.sendMessage("${prefix}§e未知子命令，使用 /$label help 查看帮助")
+                sender.sendMessage("$prefix§e${loc("commands.unknown_subcommand", mapOf("label" to label))}")
             }
         }
         return true
     }
 
     private fun showTop(sender: CommandSender, title: String, ranked: List<Pair<UUID, Int>>) {
-        sender.sendMessage("${prefix}$title")
+        sender.sendMessage("$prefix$title")
         for (i in 0 until 10) {
-            val line = ranked.getOrNull(i)?.let { "${i + 1}. ${it.first} - ${it.second}" } ?: "${i + 1}. -"
+            val line = ranked.getOrNull(i)?.let {
+                loc(
+                    "commands.top.line",
+                    mapOf("rank" to (i + 1).toString(), "player" to it.first.toString(), "value" to it.second.toString())
+                )
+            } ?: loc("commands.top.empty_line", mapOf("rank" to (i + 1).toString()))
             sender.sendMessage(line)
         }
     }
 
     private fun sendHelp(sender: CommandSender) {
-        sender.sendMessage("${prefix}§bSignInPlus 指令帮助")
-        sender.sendMessage("§7/signin §f- 直接签到（同 /checkin、/qiandao、/qd）")
-        sender.sendMessage("§7/signinplus help §f- 查看帮助")
-        sender.sendMessage("§7/signinplus top [total|streak] §f- 查看排行前十（默认 total）")
-        sender.sendMessage("§7/signinplus force_check_in <player> §f- 强制为某人签到今日")
-        sender.sendMessage("§7/signinplus reload §f- 重载配置并重启 Web API")
+        sender.sendMessage("$prefix${loc("commands.help.title")}")
+        sender.sendMessage(loc("commands.help.signin"))
+        sender.sendMessage(loc("commands.help.help"))
+        sender.sendMessage(loc("commands.help.top"))
+        sender.sendMessage(loc("commands.help.force_check_in"))
+        sender.sendMessage(loc("commands.help.reload"))
      }
 
      private fun handleDebugTrigger(sender: CommandSender, args: List<String>) {
          if (args.isEmpty()) {
-             sender.sendMessage("${prefix}§eUsage: /signinplus debug trigger <type> [value]")
+             sender.sendMessage("$prefix§e${loc("commands.debug.usage_trigger")}")
              return
          }
 
@@ -396,19 +383,19 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
              return
          }
 
-         sender.sendMessage("${prefix}§aTriggering debug reward for type '$type'...")
+         sender.sendMessage("$prefix§a${loc("commands.debug.triggering", mapOf("type" to type))}")
 
          when (type) {
              "default" -> plugin.rewardExecutor.runDefaultRewards(player.uniqueId)
              "cumulative" -> {
                  val days = value?.toIntOrNull()
                  if (days == null) {
-                     sender.sendMessage("${prefix}§eUsage: /signinplus debug trigger cumulative <days>")
+                     sender.sendMessage("$prefix§e${loc("commands.debug.usage_cumulative")}")
                      return
                  }
                  val validDays = plugin.config.getMapList("cumulative").mapNotNull { it["times"]?.toString() }
                  if (days.toString() !in validDays) {
-                     sender.sendMessage("${prefix}§cInvalid days value. Available options: ${validDays.joinToString(" | ")}")
+                     sender.sendMessage("$prefix§c${loc("commands.debug.invalid_days", mapOf("options" to validDays.joinToString(" | ")))}")
                      return
                  }
                  plugin.rewardExecutor.runCumulativeRewards(days, player.uniqueId, true)
@@ -417,12 +404,12 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
              "streak" -> {
                  val days = value?.toIntOrNull()
                  if (days == null) {
-                     sender.sendMessage("${prefix}§eUsage: /signinplus debug trigger streak <days>")
+                     sender.sendMessage("$prefix§e${loc("commands.debug.usage_streak")}")
                      return
                  }
                  val validDays = plugin.config.getMapList("streak").mapNotNull { it["times"]?.toString() }
                  if (days.toString() !in validDays) {
-                     sender.sendMessage("${prefix}§cInvalid days value. Available options: ${validDays.joinToString(" | ")}")
+                     sender.sendMessage("$prefix§c${loc("commands.debug.invalid_days", mapOf("options" to validDays.joinToString(" | ")))}")
                      return
                  }
                  plugin.rewardExecutor.runStreakRewards(days, player.uniqueId, true)
@@ -432,13 +419,13 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                  val rank = value?.toIntOrNull()
                  if (rank == null) {
                      val ranks = plugin.config.getMapList("top").mapNotNull { it["rank"]?.toString() }.joinToString(" | ")
-                     sender.sendMessage("${prefix}§eUsage: /signinplus debug trigger top <rank>")
-                     sender.sendMessage("${prefix}§7Available ranks: $ranks")
+                     sender.sendMessage("$prefix§e${loc("commands.debug.usage_top")}")
+                     sender.sendMessage("$prefix§7${loc("commands.debug.available_ranks", mapOf("ranks" to ranks))}")
                      return
                  }
                  val validRanks = plugin.config.getMapList("top").mapNotNull { it["rank"]?.toString() }
                  if (rank.toString() !in validRanks) {
-                     sender.sendMessage("${prefix}§cInvalid rank value. Available options: ${validRanks.joinToString(" | ")}")
+                     sender.sendMessage("$prefix§c${loc("commands.debug.invalid_rank", mapOf("options" to validRanks.joinToString(" | ")))}")
                      return
                  }
                  plugin.rewardExecutor.runTopRewards(rank, player.uniqueId, true)
@@ -447,8 +434,8 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
              "special_dates" -> {
                  if (value == null) {
                      val dates = plugin.config.getMapList("special_dates").mapNotNull { it["date"]?.toString() }.joinToString(" | ")
-                     sender.sendMessage("${prefix}§eUsage: /signinplus debug trigger special_dates <date> [previous_day]")
-                     sender.sendMessage("${prefix}§7Available dates: $dates")
+                     sender.sendMessage("$prefix§e${loc("commands.debug.usage_special_dates")}")
+                     sender.sendMessage("$prefix§7${loc("commands.debug.available_dates", mapOf("dates" to dates))}")
                      return
                  }
                  val validDates = plugin.config.getMapList("special_dates").mapNotNull { it["date"]?.toString() }
@@ -464,21 +451,21 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                  val prevArg = args.getOrNull(2)
                  if (prevArg != null) {
                      if (!repeatEnabled) {
-                         sender.sendMessage("${prefix}§cRepeat is disabled for this rule; previous_day is not accepted.")
+                         sender.sendMessage("$prefix§c${loc("commands.debug.special_dates.repeat_disabled")}")
                          return
                      }
                      val prev = prevArg.toIntOrNull()
                      if (prev == null) {
-                         sender.sendMessage("${prefix}§eUsage: /signinplus debug trigger special_dates <date> [previous_day]")
-                         sender.sendMessage("${prefix}§7previous_day must be an integer. Allowed range: 0..$limit")
+                         sender.sendMessage("$prefix§e${loc("commands.debug.usage_special_dates")}")
+                         sender.sendMessage("$prefix§7${loc("commands.debug.previous_day_must_be_integer", mapOf("limit" to limit.toString()))}")
                          return
                      }
                      if (prev < 0 || prev > limit) {
-                         sender.sendMessage("${prefix}§cInvalid previous_day: $prev. Allowed range: 0..$limit")
+                         sender.sendMessage("$prefix§c${loc("commands.debug.special_dates.invalid_prev", mapOf("prev" to prev.toString(), "limit" to limit.toString()))}")
                          return
                      }
                      plugin.rewardExecutor.runSpecialDateRewards(value, player.uniqueId, prev)
-                     sender.sendMessage("${prefix}§aDebug trigger for 'special_dates' executed for ${player.name}.")
+                     sender.sendMessage("$prefix§a${loc("commands.debug.special_dates.executed", mapOf("player" to player.name))}")
                      return
                  }
 
@@ -486,12 +473,12 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
              }
 
              else -> {
-                 sender.sendMessage("${prefix}§eUnknown trigger type: $type")
-                 return
+                                sender.sendMessage("$prefix§e${loc("commands.debug.unknown_trigger", mapOf("type" to type))}")
+                                return
              }
          }
 
-         sender.sendMessage("${prefix}§aDebug trigger for '$type' executed for ${player.name}.")
+                 sender.sendMessage("$prefix§a${loc("commands.debug.executed", mapOf("type" to type, "player" to player.name))}")
      }
 
      override fun onTabComplete(

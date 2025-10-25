@@ -2,6 +2,7 @@ package cc.vastsea.rewards
 
 import cc.vastsea.SignInPlus
 import cc.vastsea.storage.Points
+import me.clip.placeholderapi.libs.kyori.adventure.text.NBTComponent
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.Sound
