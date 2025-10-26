@@ -65,7 +65,7 @@ class WebApiServer(
             val player = Bukkit.getOfflinePlayer(pName)
             val i = PlayerStat(player.uniqueId)
             val json = "{" +
-                    "\"name\":\"${pName}\"," +
+                    "\"id\":\"${player.uniqueId}\"," +
                     "\"total\":${i.totalDays}," +
                     "\"streak\":${i.streakDays}," +
                     "\"last_check_in_time\":\"${i.lastCheckInTime}\"," +

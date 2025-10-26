@@ -1,5 +1,6 @@
 package cc.vastsea.storage
 
+import cc.vastsea.SignInPlus
 import java.util.UUID
 
 data class PlayerStat(
@@ -11,15 +12,13 @@ data class PlayerStat(
     var points: Double = 0.0,
     var correctionSlipAmount: Int = 0
 ) {
-    fun PlayerStat(player: UUID): PlayerStat {
-        return PlayerStat(
-            uuid = player,
-            totalDays = Checkins.getTotalDays(player),
-            streakDays = Checkins.getStreakDays(player),
-            lastCheckInTime = Checkins.getLastCheckInTime(player),
-            rankToday = Checkins.getRankToday(player),
-            points = Points.getPoints(player),
-            correctionSlipAmount = CorrectionSlips.getCorrectionSlipAmount(player)
-        )
-    }
+    constructor(player: UUID) : this(
+        uuid = player,
+        totalDays = Checkins.getTotalDays(player),
+        streakDays = Checkins.getStreakDays(player),
+        lastCheckInTime = Checkins.getLastCheckInTime(player),
+        rankToday = Checkins.getRankToday(player),
+        points = Points.getPoints(player),
+        correctionSlipAmount = CorrectionSlips.getCorrectionSlipAmount(player)
+    )
 }

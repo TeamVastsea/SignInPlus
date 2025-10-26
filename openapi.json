@@ -1,0 +1,154 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SignInPlus Web API",
+    "version": "1.0.0",
+    "description": "HTTP API exposed by the SignInPlus Minecraft plugin (endpoints discovered from src/main/kotlin/cc/vastsea/web/WebApiServer.kt).",
+    "contact": { "name": "TeamVastsea" }
+  },
+  "servers": [
+    {
+      "url": "http://{host}:{port}{basePath}",
+      "description": "Runtime server (replace variables as needed)",
+      "variables": {
+        "host": { "default": "localhost" },
+        "port": { "default": "8080" },
+        "basePath": { "default": "" }
+      }
+    }
+  ],
+  "paths": {
+    "/ifsignin": {
+      "get": {
+        "summary": "检查玩家今天是否签到",
+        "parameters": [
+          { "name": "player", "in": "query", "required": true, "schema": { "type": "string" }, "description": "玩家名" }
+        ],
+        "responses": {
+          "200": { "description": "返回 true 或 false（文本）", "content": { "text/plain": { "schema": { "type": "string", "example": "true" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/total": {
+      "get": {
+        "summary": "获取玩家累计签到天数",
+        "parameters": [ { "name": "player", "in": "query", "required": true, "schema": { "type": "string" } } ],
+        "responses": {
+          "200": { "description": "返回整数（文本）", "content": { "text/plain": { "schema": { "type": "string", "example": "42" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/streak": {
+      "get": {
+        "summary": "获取玩家当前连签天数",
+        "parameters": [ { "name": "player", "in": "query", "required": true, "schema": { "type": "string" } } ],
+        "responses": {
+          "200": { "description": "返回整数（文本）", "content": { "text/plain": { "schema": { "type": "string", "example": "3" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/last_check_in_time": {
+      "get": {
+        "summary": "获取玩家上次签到时间（字符串）",
+        "parameters": [ { "name": "player", "in": "query", "required": true, "schema": { "type": "string" } } ],
+        "responses": {
+          "200": { "description": "返回时间字符串（文本）", "content": { "text/plain": { "schema": { "type": "string", "example": "2025-10-26T13:12:00Z" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/ranktoday": {
+      "get": {
+        "summary": "获取玩家今日排名（字符串）",
+        "parameters": [ { "name": "player", "in": "query", "required": true, "schema": { "type": "string" } } ],
+        "responses": {
+          "200": { "description": "返回排名字符串（文本）", "content": { "text/plain": { "schema": { "type": "string", "example": "5" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/points": {
+      "get": {
+        "summary": "获取玩家积分（以两位小数显示）",
+        "parameters": [ { "name": "player", "in": "query", "required": true, "schema": { "type": "string" } } ],
+        "responses": {
+          "200": { "description": "返回积分字符串（格式化为两位小数，例如 12.34）", "content": { "text/plain": { "schema": { "type": "string", "example": "12.34" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/info": {
+      "get": {
+        "summary": "获取玩家综合信息（JSON）",
+        "parameters": [ { "name": "player", "in": "query", "required": true, "schema": { "type": "string" } } ],
+        "responses": {
+          "200": {
+            "description": "玩家信息 JSON",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PlayerInfo" },
+                "example": {
+                  "name": "Steve",
+                  "total": 42,
+                  "streak": 3,
+                  "last_check_in_time": "2025-10-26T13:12:00Z",
+                  "rank_today": "5",
+                  "points": 12.34
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/amounttoday": {
+      "get": {
+        "summary": "获取今日签到人数",
+        "responses": {
+          "200": { "description": "返回今日签到人数（整数，文本）", "content": { "text/plain": { "schema": { "type": "string", "example": "10" } } } },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PlayerInfo": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "total": { "type": "integer", "format": "int32" },
+          "streak": { "type": "integer", "format": "int32" },
+          "last_check_in_time": { "type": "string" },
+          "rank_today": { "type": "string" },
+          "points": { "type": "number", "format": "double" }
+        },
+        "required": ["name","total","streak","last_check_in_time","points"]
+      }
+    },
+    "responses": {
+      "BadRequest": { "description": "缺少或无效的请求参数", "content": { "text/plain": { "schema": { "type": "string", "example": "missing player" } } } },
+      "MethodNotAllowed": { "description": "仅支持 GET", "content": { "text/plain": { "schema": { "type": "string", "example": "method not allowed" } } } },
+      "InternalError": { "description": "服务器内部错误", "content": { "text/plain": { "schema": { "type": "string", "example": "internal error" } } } }
+    }
+  }
+}
