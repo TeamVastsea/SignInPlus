@@ -19,7 +19,6 @@
 # 示例
 # - postgresql: type=postgresql, url=127.0.0.1:5432/signinplus?sslmode=disable, username=local_pg, password=...
 #########################################################
-
 database:
   type: sqlite
   url: signinplus.db
