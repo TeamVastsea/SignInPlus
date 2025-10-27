@@ -3,7 +3,7 @@ package cc.vastsea.util
 import org.bukkit.plugin.java.JavaPlugin
 
 object PrefixUtil {
-    private const val DEFAULT_PREFIX = "§7[§a签到Plus§7] "
+    private const val DEFAULT_PREFIX = "§7[§aSignInPlus§7] "
 
     /**
      * 从配置读取 `message_prefix`，并将 `&` 颜色码转换为 `§`。
