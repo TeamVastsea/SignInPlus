@@ -61,8 +61,8 @@ default:
     - "[COMMAND] give %player_name% apple 64"
     - "[SOUND] ENTITY_PLAYER_LEVELUP 0.5 1.0"
     - "[ITEM] apple 64"
-    - "[BROADCAST] %player_name% &6今日已签到！"
-    - "[TITLE] &c签到成功！"
+    - "[BROADCAST] %player_name% §6今日已签到！"
+    - "[TITLE] §c签到成功！"
     - "[SLEEP] 20"
     - "[EFFECT] speed 2 10"
     
@@ -218,7 +218,7 @@ auto_check_in_on_login:
 # bState: 是否启用bState统计
 # debug: 是否启用调试模式 (输出更多日志)
 #########################################################
-message_prefix: "&7[&a签到Plus&7] "
+message_prefix: "§7[§a签到Plus§7] "
 timezone: "Asia/Shanghai"
 language: zh_CN
 bState: true

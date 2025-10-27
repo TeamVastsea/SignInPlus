@@ -1,24 +1,16 @@
 package cc.vastsea.locale
 
-import org.bukkit.ChatColor
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
 import java.io.InputStreamReader
 
-/**
- * Simple localization loader that supports:
- * - loading lang files from plugin data folder (plugins/SignInPlus/lang/<locale>.yml)
- * - falling back to the embedded resource under /lang/<locale>.yml
- * - placeholder replacement using {name} style
- * - color code translation using & -> § (via ChatColor)
- */
 class Localization(private val plugin: JavaPlugin) {
     private val messages: MutableMap<String, String> = mutableMapOf()
     var locale: String = "en_US"
         private set
 
-    /** Load a locale (e.g. "en_US"). Will prefer external file under plugin data folder if present, else use bundled resource. */
+    /** 加载指定语言 (如 "en_US")。优先使用插件数据目录下的外部文件；若不存在则使用打包资源。资源中的颜色码应使用 § 符号。 */
     fun load(locale: String) {
         this.locale = locale
         messages.clear()
@@ -33,15 +25,15 @@ class Localization(private val plugin: JavaPlugin) {
                 YamlConfiguration.loadConfiguration(external)
             }
             else -> {
-                // If resource exists in jar, copy it to data folder for easy customization and load it.
+                // 如果 jar 中存在资源，则复制到数据目录便于管理员修改，然后加载
                 val resourcePath = "lang/$locale.yml"
                 val stream = plugin.getResource(resourcePath)
                 if (stream != null) {
                     try {
-                        // try to save a copy to data folder so server admins can edit
+                        // 尝试保存一份到数据目录，方便编辑
                         plugin.saveResource(resourcePath, false)
                     } catch (ignored: IllegalArgumentException) {
-                        // saveResource may throw if already exists — ignore
+                        // 若已存在会抛异常，忽略之
                     }
                     val reader = InputStreamReader(stream, Charsets.UTF_8)
                     YamlConfiguration.loadConfiguration(reader)
@@ -52,18 +44,17 @@ class Localization(private val plugin: JavaPlugin) {
             }
         }
 
-        // collect all string keys (recursive)
+        // 收集所有字符串键（递归），直接保留原始内容（§ 颜色码）
         for (key in config.getKeys(true)) {
             val value = config.getString(key) ?: continue
-            messages[key] = ChatColor.translateAlternateColorCodes('&', value)
+            messages[key] = value
         }
 
         plugin.logger.info("Localization loaded: $locale (${messages.size} messages)")
     }
 
     /**
-     * Get a localized message by key (dot-separated). Example key: "msg.hello".
-     * Placeholders map will replace {name} with the value provided.
+     * 通过键获取本地化消息（点分隔）。占位符会将 {name} 替换为提供的值。
      */
     fun get(key: String, placeholders: Map<String, String>? = null): String {
         var result = messages[key] ?: "<$key>"

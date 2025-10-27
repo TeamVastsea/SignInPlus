@@ -97,16 +97,16 @@ class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) 
                 server.dispatchCommand(server.consoleSender, cmd)
             }
             action.startsWith("[MESSAGE]") -> {
-                p?.sendMessage(prefix + action.substringAfter("[MESSAGE]").trim().replace('&', '§'))
+                p?.sendMessage(prefix + action.substringAfter("[MESSAGE]").trim())
             }
             action.startsWith("[TITLE]") -> {
                 val parts = action.substringAfter("[TITLE]").trim().split("|", limit = 2)
-                val title = (parts.getOrNull(0) ?: "").replace('&', '§')
-                val sub = (parts.getOrNull(1) ?: "").replace('&', '§')
+                val title = (parts.getOrNull(0) ?: "")
+                val sub = (parts.getOrNull(1) ?: "")
                 p?.sendTitle(title, sub, 10, 60, 10)
             }
             action.startsWith("[BROADCAST]") -> {
-                val msg = action.substringAfter("[BROADCAST]").trim().replace("%player_name%", p?.name ?: "").replace('&', '§')
+                val msg = action.substringAfter("[BROADCAST]").trim().replace("%player_name%", p?.name ?: "")
                 server.broadcastMessage(prefix + msg)
             }
             action.startsWith("[SOUND]") -> {

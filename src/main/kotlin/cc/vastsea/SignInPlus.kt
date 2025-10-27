@@ -44,23 +44,23 @@ class SignInPlus : JavaPlugin() {
         if (server.pluginManager.getPlugin("PlaceholderAPI") != null) {
             try {
                 SignInPlusExpansion(this).register()
-                logger.info("PlaceholderAPI 扩展已注册")
+                logger.info("PlaceholderAPI Expansion Registered")
             } catch (t: Throwable) {
-                logger.warning("注册 Placeholder 扩展失败: ${t.message}")
+                logger.warning("Register Placeholder Expansion Failed: ${t.message}")
             }
         }
 
         // 启动 Web API（仅查询接口）
         startWebApiIfEnabled()
 
-        logger.info("SignInPlus 已启用")
+        logger.info("SignInPlus Enabled")
     }
 
     override fun onDisable() {
         // 停止 Web API
         webServer?.stop()
         webServer = null
-        logger.info("SignInPlus 已禁用")
+        logger.info("SignInPlus Disabled")
     }
 
     fun reloadAll() {
@@ -85,8 +85,8 @@ class SignInPlus : JavaPlugin() {
     }
 
     private fun startWebApiIfEnabled() {
-        val web = config.getConfigurationSection("web_api")
-        val enabled = web?.getBoolean("enable_web_api") ?: false
+        val web = config.getConfigurationSection("web_api") ?: return
+        val enabled = web.getBoolean("enable_web_api")
         if (!enabled) return
 
         val address = web.getString("web_api_address") ?: "0.0.0.0"
@@ -95,7 +95,7 @@ class SignInPlus : JavaPlugin() {
 
         webServer = WebApiServer(address, port, endpoint)
         webServer?.start()
-        logger.info("Web API 已启动: http://$address:$port$endpoint")
+        logger.info("Web API Launched: http://$address:$port$endpoint")
     }
 
     companion object {

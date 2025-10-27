@@ -13,7 +13,7 @@ import java.util.*
 
 class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCompleter {
     private val prefix
-        get() = (plugin.config.getString("message_prefix") ?: "&7[&a签到Plus&7] ").replace('&', '§')
+        get() = plugin.config.getString("message_prefix") ?: "§7[§a签到Plus§7] "
 
     private fun loc(key: String, placeholders: Map<String, String>? = null): String {
         return SignInPlus.localization.get(key, placeholders)
@@ -195,7 +195,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                                     }"
                                 )
                             }
-                        } else sender.sendMessage("${prefix}§e用法: /$label points set <player> <amount>")
+                        } else sender.sendMessage("$prefix${loc("commands.usage", mapOf("usage" to "/$label points set <player> <amount>"))}")
                     }
 
                     "clear" -> {
@@ -209,7 +209,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                             Points.setPoints(player.uniqueId, 0.0)
                             // zh_CN: clear_points_success expects {target}
                             sender.sendMessage("$prefix§a${loc("commands.clear_points_success", mapOf("target" to target))}")
-                        } else sender.sendMessage("${prefix}§e用法: /$label points clear <player>")
+                        } else sender.sendMessage("$prefix${loc("commands.usage", mapOf("usage" to "/$label points clear <player>"))}")
                     }
 
                     "decrease" -> {
@@ -229,7 +229,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                                 // zh_CN: decrease_points_success expects {points} and {target}
                                 sender.sendMessage("$prefix§a${loc("commands.decrease_points_success", mapOf("target" to target, "points" to String.format("%.2f", amount)))}")
                             }
-                        } else sender.sendMessage("${prefix}§e用法: /$label points decrease <player> <amount>")
+                        } else sender.sendMessage("$prefix${loc("commands.usage", mapOf("usage" to "/$label points decrease <player> <amount>"))}")
                     }
 
                     "add" -> {
@@ -249,7 +249,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                                 // zh_CN: increase_points_success expects {points} and {target}
                                 sender.sendMessage("$prefix§a${loc("commands.increase_points_success", mapOf("target" to target, "points" to String.format("%.2f", amount)))}")
                             }
-                        } else sender.sendMessage("${prefix}§e用法: /$label points add <player> <amount>")
+                        } else sender.sendMessage("$prefix${loc("commands.usage", mapOf("usage" to "/$label points add <player> <amount>"))}")
                     }
 
                     else -> {
@@ -290,7 +290,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                                 CorrectionSlips.giveCorrectionSlip(player.uniqueId, amount)
                                 // zh_CN: give_slips_success expects {target} and {amount}
                                 sender.sendMessage("$prefix§a${loc("commands.give_slips_success", mapOf("target" to target, "amount" to amount.toString()))}")
-                            } else sender.sendMessage("${prefix}§e用法: /$label correction_slip give <player> [amount]")
+                            } else sender.sendMessage("$prefix${loc("commands.usage", mapOf("usage" to "/$label correction_slip give <player> [amount]"))}")
                         }
 
                         "decrease" -> {
@@ -301,7 +301,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                                 CorrectionSlips.decreaseCorrectionSlip(player.uniqueId, amount)
                                 // zh_CN: decrease_slips_success expects {target} and {amount}
                                 sender.sendMessage("$prefix§a${loc("commands.decrease_slips_success", mapOf("target" to target, "amount" to amount.toString()))}")
-                            } else sender.sendMessage("${prefix}§e用法: /$label correction_slip decrease <player> [amount]")
+                            } else sender.sendMessage("$prefix${loc("commands.usage", mapOf("usage" to "/$label correction_slip decrease <player> [amount]"))}")
                         }
 
                         "clear" -> {
@@ -311,7 +311,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                                 CorrectionSlips.clearCorrectionSlip(player.uniqueId)
                                 // zh_CN: clear_slips_success expects {target}
                                 sender.sendMessage("$prefix§a${loc("commands.clear_slips_success", mapOf("target" to target))}")
-                            } else sender.sendMessage("${prefix}§e用法: /$label correction_slip clear <player>")
+                            } else sender.sendMessage("$prefix${loc("commands.usage", mapOf("usage" to "/$label correction_slip clear <player>"))}")
                         }
 
                         else -> {
@@ -319,7 +319,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                             sender.sendMessage("$prefix${loc("commands.usage", mapOf("usage" to "/$label correction_slip <give|decrease|clear> ..."))}")
                         }
                     }
-                } else sender.sendMessage("${prefix}§e用法: /$label correction_slip <give|decrease|clear> ...")
+                } else sender.sendMessage("$prefix${loc("commands.usage", mapOf("usage" to "/$label correction_slip <give|decrease|clear> ..."))}")
             }
 
             "make_up" -> {
@@ -422,7 +422,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                 }
                 if (args.size < 2) {
                     // Use generic usage key
-                    sender.sendMessage("$prefix§e${loc("commands.usage", mapOf("usage" to "/$label debug trigger <type> [value]"))}")
+                    sender.sendMessage("$prefix${loc("commands.usage", mapOf("usage" to "/$label debug trigger <type> [value]"))}")
                     return true
                 }
                 when (args[1].lowercase()) {
