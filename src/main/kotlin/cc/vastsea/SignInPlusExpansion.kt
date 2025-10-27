@@ -7,6 +7,7 @@ import me.clip.placeholderapi.expansion.PlaceholderExpansion
 import org.bukkit.Bukkit
 import org.bukkit.OfflinePlayer
 import org.bukkit.plugin.java.JavaPlugin
+import java.util.UUID
 
 class SignInPlusExpansion(private val plugin: JavaPlugin) : PlaceholderExpansion() {
     override fun getIdentifier(): String = "signinplus"
@@ -24,6 +25,17 @@ class SignInPlusExpansion(private val plugin: JavaPlugin) : PlaceholderExpansion
             return null
         }
 
+        fun resolveUuid(targetName: String?, context: OfflinePlayer?): UUID? {
+            // 优先使用上下文玩家（无后缀时）
+            if (targetName == null) return context?.uniqueId
+            // 在线玩家精确匹配
+            plugin.server.getPlayerExact(targetName)?.uniqueId?.let { return it }
+            // 仅使用服务端已缓存的离线玩家，避免远程查询导致 NPE
+            plugin.server.offlinePlayers.firstOrNull { it.name?.equals(targetName, true) == true }?.uniqueId?.let { return it }
+            // 离线模式下可计算离线 UUID；在线模式未知玩家返回 null
+            return if (!plugin.server.onlineMode) UUID.nameUUIDFromBytes(("OfflinePlayer:" + targetName).toByteArray(Charsets.UTF_8)) else null
+        }
+
         // 今日总签到人数（无玩家上下文）
         if (lower == "amount_today") {
             return Checkins.getAmountToday().toString()
@@ -31,17 +43,22 @@ class SignInPlusExpansion(private val plugin: JavaPlugin) : PlaceholderExpansion
 
         // 今日签到状态（仅保留新键）
         matchWithOptionalName("status")?.let { targetName ->
-            val target = Bukkit.getOfflinePlayer(targetName)
-            val uuid = target.uniqueId
-            return if (Checkins.isSignedIn(uuid)) "&a已签到" else "&c未签到"
+            val uuid = resolveUuid(targetName, player) ?: return "§7未知"
+            return if (Checkins.isSignedIn(uuid)) "§a已签到" else "§c未签到"
         }
 
         // 玩家相关键（不再支持旧前缀）：total_days, streak_days, last_check_in_time, rank_today, points
         val keys = listOf("total_days", "streak_days", "last_check_in_time", "rank_today", "points")
         for (key in keys) {
             matchWithOptionalName(key)?.let { targetName ->
-                val target = Bukkit.getOfflinePlayer(targetName)
-                val uuid = target.uniqueId
+                val uuid = resolveUuid(targetName, player) ?: when (key) {
+                    "total_days" -> return "0"
+                    "streak_days" -> return "0"
+                    "last_check_in_time" -> return "-"
+                    "rank_today" -> return "-"
+                    "points" -> return "0.00"
+                    else -> return null
+                }
                 return when (key) {
                     "total_days" -> Checkins.getTotalDays(uuid).toString()
                     "streak_days" -> Checkins.getStreakDays(uuid).toString()
@@ -55,8 +72,7 @@ class SignInPlusExpansion(private val plugin: JavaPlugin) : PlaceholderExpansion
 
         // 补签卡数量（仅保留新键 corr）
         matchWithOptionalName("corr")?.let { targetName ->
-            val target = Bukkit.getOfflinePlayer(targetName)
-            val uuid = target.uniqueId
+            val uuid = resolveUuid(targetName, player) ?: return "0"
             return CorrectionSlips.getCorrectionSlipAmount(uuid).toString()
         }
 
