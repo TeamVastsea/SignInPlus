@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "cc.vastsea"
-version = "1.2.3"
+version = "1.3"
 
 repositories {
     mavenCentral()
