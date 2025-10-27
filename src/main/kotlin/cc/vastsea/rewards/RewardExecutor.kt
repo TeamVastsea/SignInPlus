@@ -1,5 +1,6 @@
 package cc.vastsea.rewards
 
+import cc.vastsea.util.PrefixUtil
 import cc.vastsea.SignInPlus
 import cc.vastsea.storage.Checkins
 import cc.vastsea.storage.ClaimedRewards
@@ -17,8 +18,8 @@ import java.time.LocalDate
 import java.util.UUID
 import kotlin.random.Random
 
-class RewardExecutor(private val plugin: SignInPlus) {
-    private val prefix = plugin.config.getString("message_prefix") ?: "§7[§a签到Plus§7] "
+class RewardExecutor(private val plugin: cc.vastsea.SignInPlus) {
+    private val prefix = PrefixUtil.fromConfig(plugin)
     private val logger = DebugLogger(plugin)
     private val actionsRunner = ActionsRunner(plugin, prefix)
     private val isDebug = plugin.config.getBoolean("debug", false)

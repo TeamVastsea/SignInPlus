@@ -1,5 +1,6 @@
 package cc.vastsea
 
+import cc.vastsea.util.PrefixUtil
 import cc.vastsea.storage.Checkins
 import cc.vastsea.storage.CorrectionSlips
 import cc.vastsea.storage.PlayerStat
@@ -13,7 +14,7 @@ import java.util.*
 
 class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCompleter {
     private val prefix
-        get() = plugin.config.getString("message_prefix") ?: "§7[§a签到Plus§7] "
+        get() = PrefixUtil.fromConfig(plugin)
 
     private fun loc(key: String, placeholders: Map<String, String>? = null): String {
         return SignInPlus.localization.get(key, placeholders)
