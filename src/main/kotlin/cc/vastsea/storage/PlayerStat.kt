@@ -7,8 +7,8 @@ data class PlayerStat(
     val uuid: UUID,
     var totalDays: Int = 0,
     var streakDays: Int = 0,
-    var lastCheckInTime: String = "未签到",
-    var rankToday: String = "未签到",
+    var lastCheckInTime: String = SignInPlus.localization.get("commands.status.not_signed_in"),
+    var rankToday: String = SignInPlus.localization.get("commands.status.not_signed_in"),
     var points: Double = 0.0,
     var correctionSlipAmount: Int = 0
 ) {

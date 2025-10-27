@@ -10,6 +10,15 @@
     {
       "url": "http://127.0.0.1:7999/api",
       "description": "Local test server"
+    },
+    {
+      "url": "http://{host}:{port}{basePath}",
+      "description": "Custom server",
+      "variables": {
+        "host": { "default": "localhost" },
+        "port": { "default": "8080" },
+        "basePath": { "default": "" }
+      }
     }
   ],
   "paths": {

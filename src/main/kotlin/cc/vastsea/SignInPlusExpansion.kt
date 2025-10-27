@@ -43,8 +43,8 @@ class SignInPlusExpansion(private val plugin: JavaPlugin) : PlaceholderExpansion
 
         // 今日签到状态（仅保留新键）
         matchWithOptionalName("status")?.let { targetName ->
-            val uuid = resolveUuid(targetName, player) ?: return "§7未知"
-            return if (Checkins.isSignedIn(uuid)) "§a已签到" else "§c未签到"
+            val uuid = resolveUuid(targetName, player) ?: return SignInPlus.localization.get("commands.status.unknown")
+            return if (Checkins.isSignedIn(uuid)) "§a" + SignInPlus.localization.get("commands.status.signed_in") else "§c" + SignInPlus.localization.get("commands.status.not_signed_in")
         }
 
         // 玩家相关键（不再支持旧前缀）：total_days, streak_days, last_check_in_time, rank_today, points

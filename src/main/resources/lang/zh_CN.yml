@@ -28,6 +28,7 @@ commands:
   status:
     signed_in: "已签到"
     not_signed_in: "未签到"
+    unknown: "§7未知"
     stats_of: "§b玩家 {targetName} 的签到状态"
     status_today: "今日签到: {status}"
     total_sign_ins: "累计签到天数: §6{totalDays}"

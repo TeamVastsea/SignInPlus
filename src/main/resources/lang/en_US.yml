@@ -28,6 +28,7 @@ commands:
   status:
     signed_in: "Signed in"
     not_signed_in: "Not signed in"
+    unknown: "§7Unknown"
     stats_of: "§bSign-in status of player {targetName}"
     status_today: "Today's sign-in: {status}"
     total_sign_ins: "Total sign-ins: §6{totalDays}"

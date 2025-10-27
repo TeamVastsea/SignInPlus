@@ -1,5 +1,6 @@
 package cc.vastsea.storage
 
+import cc.vastsea.SignInPlus
 import cc.vastsea.SignInPlus.Companion.now
 import cc.vastsea.SignInPlus.Companion.today
 import org.jetbrains.exposed.sql.*
@@ -150,7 +151,7 @@ object Checkins : Table() {
                 .limit(1)
                 .firstOrNull()
                 ?.get(Checkins.time)
-            time?.toString() ?: "未签到"
+            time?.toString() ?: SignInPlus.localization.get("commands.status.not_signed_in")
         }
     }
 
@@ -165,7 +166,7 @@ object Checkins : Table() {
             if (rank != -1) {
                 (rank + 1).toString()
             } else {
-                "未签到"
+                SignInPlus.localization.get("commands.status.not_signed_in")
             }
         }
     }
