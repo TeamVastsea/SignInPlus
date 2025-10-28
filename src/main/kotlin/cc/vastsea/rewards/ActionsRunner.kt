@@ -2,6 +2,7 @@ package cc.vastsea.rewards
 
 import cc.vastsea.SignInPlus
 import cc.vastsea.storage.Points
+import cc.vastsea.util.ColorUtil
 import me.clip.placeholderapi.libs.kyori.adventure.text.NBTComponent
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -87,7 +88,7 @@ class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) 
         Bukkit.getScheduler().runTaskLater(plugin, Runnable { runSingleAction(action, player) }, delayTicks)
     }
 
-    private fun runSingleAction(action: String, player: UUID) {
+    private fun runSingleAction(action: String, player: java.util.UUID) {
         val server = plugin.server
         val p = server.getPlayer(player)
 
@@ -97,16 +98,18 @@ class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) 
                 server.dispatchCommand(server.consoleSender, cmd)
             }
             action.startsWith("[MESSAGE]") -> {
-                p?.sendMessage(prefix + action.substringAfter("[MESSAGE]").trim())
+                val msg = ColorUtil.ampersandToSection(action.substringAfter("[MESSAGE]").trim())
+                p?.sendMessage(prefix + msg)
             }
             action.startsWith("[TITLE]") -> {
                 val parts = action.substringAfter("[TITLE]").trim().split("|", limit = 2)
-                val title = (parts.getOrNull(0) ?: "")
-                val sub = (parts.getOrNull(1) ?: "")
+                val title = ColorUtil.ampersandToSection(parts.getOrNull(0) ?: "")
+                val sub = ColorUtil.ampersandToSection(parts.getOrNull(1) ?: "")
                 p?.sendTitle(title, sub, 10, 60, 10)
             }
             action.startsWith("[BROADCAST]") -> {
-                val msg = action.substringAfter("[BROADCAST]").trim().replace("%player_name%", p?.name ?: "")
+                val raw = action.substringAfter("[BROADCAST]").trim().replace("%player_name%", p?.name ?: "")
+                val msg = ColorUtil.ampersandToSection(raw)
                 server.broadcastMessage(prefix + msg)
             }
             action.startsWith("[SOUND]") -> {

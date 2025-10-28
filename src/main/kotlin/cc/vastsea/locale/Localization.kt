@@ -1,56 +1,31 @@
 package cc.vastsea.locale
 
+import cc.vastsea.util.ColorUtil
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
-import java.io.InputStreamReader
+import java.util.Locale
 
 class Localization(private val plugin: JavaPlugin) {
-    private val messages: MutableMap<String, String> = mutableMapOf()
     var locale: String = "en_US"
-        private set
+    private val messages: MutableMap<String, String> = mutableMapOf()
 
-    /** 加载指定语言 (如 "en_US")。优先使用插件数据目录下的外部文件；若不存在则使用打包资源。资源中的颜色码应使用 § 符号。 */
-    fun load(locale: String) {
-        this.locale = locale
+    fun load(newLocale: String) {
+        val folder = File(plugin.dataFolder, "lang")
+        if (!folder.exists()) folder.mkdirs()
+        val resourceName = "lang/$newLocale.yml"
+        val file = File(folder, "$newLocale.yml")
+        if (!file.exists()) plugin.saveResource(resourceName, false)
+        val config = YamlConfiguration.loadConfiguration(file)
         messages.clear()
-
-        val langDir = File(plugin.dataFolder, "lang")
-        if (!langDir.exists()) langDir.mkdirs()
-
-        val external = File(langDir, "$locale.yml")
-
-        val config = when {
-            external.exists() -> {
-                YamlConfiguration.loadConfiguration(external)
-            }
-            else -> {
-                // 如果 jar 中存在资源，则复制到数据目录便于管理员修改，然后加载
-                val resourcePath = "lang/$locale.yml"
-                val stream = plugin.getResource(resourcePath)
-                if (stream != null) {
-                    try {
-                        // 尝试保存一份到数据目录，方便编辑
-                        plugin.saveResource(resourcePath, false)
-                    } catch (ignored: IllegalArgumentException) {
-                        // 若已存在会抛异常，忽略之
-                    }
-                    val reader = InputStreamReader(stream, Charsets.UTF_8)
-                    YamlConfiguration.loadConfiguration(reader)
-                } else {
-                    plugin.logger.warning("Localization resource $resourcePath not found in jar and no external file present")
-                    YamlConfiguration()
-                }
-            }
-        }
-
-        // 收集所有字符串键（递归），直接保留原始内容（§ 颜色码）
         for (key in config.getKeys(true)) {
-            val value = config.getString(key) ?: continue
-            messages[key] = value
+            if (config.isString(key)) {
+                val value = config.getString(key) ?: continue
+                // 保留原始内容，转换在 get() 时进行，支持 & 与 § 并存
+                messages[key] = value
+            }
         }
-
-        plugin.logger.info("Localization loaded: $locale (${messages.size} messages)")
+        locale = newLocale
     }
 
     /**
@@ -63,6 +38,7 @@ class Localization(private val plugin: JavaPlugin) {
                 result = result.replace("{$k}", v)
             }
         }
-        return result
+        // 统一在返回时进行 & 到 § 的转换
+        return ColorUtil.ampersandToSection(result)
     }
 }
