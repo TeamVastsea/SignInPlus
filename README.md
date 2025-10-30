@@ -1,99 +1,85 @@
 # SignInPlus
 
-**简介**
-- 面向 Paper/Spigot 的每日签到插件，支持累计/连续/特殊日期/排行榜奖励。
-- 内置本地化与可配置前缀、可选 Web API，只读查询接口。
-- 支持 PlaceholderAPI 扩展用于看板、全息与记分板显示。
+**插件介绍**
+- 面向 Paper/Spigot 的现代化每日签到插件：支持默认奖励、累计签、连签、特殊日期与排行榜奖励；内置补签卡、积分、PAPI、可选 Web API。
+- 颜色码友好；消息前缀可配；多语言内置。
+- 作者：[Snowball_233](https://github.com/SnowballXueQiu)，[zrll_](https://github.com/zrll12)
 
-**特性**
-- 日常签到：`/signin` 别名包括 `/checkin`、`/qiandao`、`/qd`。
-- 奖励类型：默认奖励、累计签到（`cumulative`）、连续签到（`streak`）、特殊日期（`special_dates`）、当日排行榜（`top`）。
-- 奖励动作：`[MESSAGE]`、`[TITLE]`、`[BROADCAST]`（颜色码使用 `§`）。
-- 本地化：从 `config.yml` 的 `locale` 加载语言文件，命令提示与消息支持占位符替换。
-- 统计与积分：提供总天数、连签天数、今日排行与积分管理。
-- PlaceholderAPI：前缀 `signinplus`，支持玩家上下文与后缀玩家名查询。
+**配置与文档**
+- 配置文件示例与完整注释：`src/main/resources/config.yml`
+- Web API OpenAPI 文档：`openapi.json`
 
-**安装**
-- 将构建出的插件包复制到服务器 `plugins/` 目录并重启服务器。
-- 若使用占位符，请安装 PlaceholderAPI 插件。
+**模块一览**
+- 基础签到/首签/连签/累计签
+  - 基础签到：玩家执行 `/signin`（别名：`/checkin`、`/qiandao`、`/qd`）触发 `default.actions`。
+  - 首签：可用 `top` 模块配置当日首位签到（`rank: 1`）的额外奖励。
+  - 连签与累计签：分别由 `streak` 与 `cumulative` 块定义阈值与奖励，支持多档配置与去重发放。
+  - 特殊日期：`special_dates` 支持按具体日期、每年、每月或每周匹配触发，可设重复次数限制。
+- PAPI（PlaceholderAPI）
+  - 标识符：`signinplus`
+  - 占位符（支持后缀玩家名，例如 `total_days_Steve`）：
+    - `amount_today` 今日签到人数
+    - `status` 今日是否签到（带颜色）
+    - `total_days` 累计天数
+    - `streak_days` 连签天数
+    - `last_check_in_time` 上次签到时间
+    - `rank_today` 今日排名
+    - `points` 积分（两位小数显示）
+    - `corr` 补签卡数量
+- 签到积分
+  - 存储为“分”（整数）以避免浮点误差，显示统一格式化为两位小数。
+  - 奖励动作支持：`[POINTS] 64`、`[POINTS] 1..5 .2f`、`[POINTS] 1..5 z` 等（范围与格式说明见配置）。
+  - 指令支持查看、设置、增加、扣减与清空积分（详见下文“指令详解”）。
+- Web API（只读查询）
+  - 开启方式：`web_api.enable_web_api: true` 后，插件启动 HTTP 服务，默认 `http://<addr>:<port><endpoint>`。
+  - 端点（GET）：`/ifsignin?player=...`、`/total?player=...`、`/streak?player=...`、`/last_check_in_time?player=...`、`/ranktoday?player=...`、`/points?player=...`、`/info?player=...`、`/amounttoday`。
+  - 外部签到：待开发（WIP）。完整定义参见 `openapi.json`。
+- 概率系统（详见配置文件）
+  - `default.actions` 中支持：`[PROB=X]` 概率触发；`[RANDOM_WEIGHTED]` + `[WEIGHT=X]` 权重触发；`[RANDOM_PICK=N]` 互斥抽取。
+  - 支持嵌套与与其他动作组合（消息、标题、物品、音效、状态、延迟等）。
+- 多语言
+  - `locale: zh_CN / en_US`，语言文件位于 `src/main/resources/lang`。
+  - 占位符 `{name}` 等按需替换；消息与标题文本支持 `&` 自动转换为 `§`。
+- 排行榜
+  - `/signinplus top [total|streak]` 展示前十；支持 `top` 模块为当日排名发放额外奖励（如 rank=1/2/3）。
+- Debug 调试器
+  - 需在配置 `debug: true` 并具备 `signinplus.admin` 权限。
+  - 用法：`/signinplus debug trigger <default|cumulative|streak|top|special_dates> [previous_value]`（例如 `streak 7`、`top 1`、`special_dates Thursday`）。
 
-**指令**
-- 玩家签到：
-  - `/signin` | `/checkin` | `/qiandao` | `/qd`
-- 查看状态：
-  - `/signinplus status [player]`
-- 重新加载配置与语言：
-  - `/signinplus reload`
-- 积分管理（管理员）：
-  - `/signinplus points set <player> <amount>`
-  - `/signinplus points clear <player>`
-  - `/signinplus points decrease <player> <amount>`
-  - `/signinplus points add <player> <amount>`
-- 排行榜：
-  - `/signinplus top [streak|total]`
-- 强制签到（管理员）：
-  - `/signinplus force_check_in <player>`
-- 调试触发（管理员，需 `config.yml` 中 `debug: true`）：
-  - `/signinplus debug trigger <type> [value]`
-  - `type` 可为：`default` | `cumulative` | `streak` | `top` | `special_dates`
+**指令详解**
+- `/signin` | `/checkin` | `/qiandao` | `/qd`：玩家签到；权限 `signinplus.user`。
+- `/signinplus status [player]`：查询状态；权限 `signinplus.user`。
+- `/signinplus reload`：重载配置与语言并重启 Web API；权限 `signinplus.admin`。
+- `/signinplus points set <player> <amount>`：设置积分；权限 `signinplus.admin`。
+- `/signinplus points add|decrease <player> <amount>`：增/扣积分；权限 `signinplus.admin`。
+- `/signinplus points clear <player>`：清空积分；权限 `signinplus.admin`。
+- `/signinplus correction_slip give|decrease|clear <player> [amount]`：管理补签卡；权限 `signinplus.admin`。
+- `/signinplus make_up [cards] [player] [force]`：补签自己或他人；权限 `signinplus.make_up`（他人需 `signinplus.admin`）。
+- `/signinplus top total|streak`：查看排行榜；权限 `signinplus.user`。
+- `/signinplus debug trigger ...`：触发奖励用于验证；权限 `signinplus.admin` 且 `debug: true`。
 
-**权限**
-- `signinplus.user`：允许使用签到与查询相关命令。
-- `signinplus.admin`：允许使用管理员与调试命令。
+**数据库**
+- 支持：`sqlite` / `mysql` / `postgresql`。
+- 配置键：`database.type`、`database.url`、`database.username`、`database.password`。
+- 初始化：
+  - SQLite：自动创建 `plugins/SignInPlus/signinplus.db`。
+  - MySQL/PostgreSQL：启动时尝试创建数据库（需账户具备建库权限）。
 
-**PlaceholderAPI**
-- 标识符：`signinplus`
-- 无玩家上下文：
-  - ``%signinplus_amount_today%`` — 今日总签到人数。
-- 玩家上下文（可用后缀 `_玩家名`，或使用请求者）：
-  - ``%signinplus_status%``
-  - ``%signinplus_total_days%``
-  - ``%signinplus_streak_days%``
-  - ``%signinplus_last_check_in_time%``
-  - ``%signinplus_rank_today%``
-  - ``%signinplus_points%``
-- 示例：
-  - ``%signinplus_total_days_Steve%``
-  - ``%signinplus_status%``（使用请求者）
+**构建与测试**
+- 构建方式（产物位于 `build/libs`）：
+  - 整包：`./gradlew shadowJar`（默认，兼容性最佳）。
+  - 只带 SQLite：`./gradlew shadowJarLite`（剔除 MySQL/PostgreSQL 驱动，体积更小）。
+  - 不带 SQLite：`./gradlew shadowJarNoSqlite`（用于仅部署 MySQL/PostgreSQL）。
+- 本地测试：`./gradlew runServer` 启动 Paper 1.21 测试服（可用于快速验证指令与奖励）。
 
-**配置**
-- `message_prefix`：消息前缀。支持 `&`（将自动转换为 `§`），默认 `§7[§a签到Plus§7] `。
-- `locale`：语言文件（默认 `en_US`）。
-- `timezone`：时区（默认 `Asia/Shanghai`）。
-- `debug`：是否允许 `/signinplus debug` 调试命令。
-- 奖励配置（示例结构）：
-  - `default`：玩家每天首次签到时触发。
-  - `cumulative`：按累计签到天数触发，示例键：`times: 7, 30, 100`。
-  - `streak`：按连续签到天数触发，示例键：`times: 7, 14, 28`。
-  - `special_dates`：指定日期触发，示例键：`date: 12-31`、`repeat: true`、`repeat_time: 3`。
-  - `top`：当日排行榜奖励，示例键：`rank: 1, 2, 3`。
+**兼容性**
+- 服务器：Paper/Spigot `1.20+`（推荐 `1.20.4+ / 1.21`）。
+- Java：服务器运行环境 `Java 21+`
+- 依赖：建议安装 PlaceholderAPI；需要安装 kotlin 插件（`depend: Kotlin`）。
 
-**奖励动作语法**
-- `[MESSAGE] <text>`：向玩家发送一条消息。
-- `[TITLE] <title> | <subtitle>`：显示标题与副标题。
-- `[BROADCAST] <text>`：全服广播一条消息。
-- 颜色码：奖励文本支持 `&` 自动转换为 `§`，也可直接使用 `§`。
-
-**Web API（可选）**
-- 当 `web_api` 配置节启用时，插件会启动只读查询服务，用于外部读取签到统计。
-- 具体端口与令牌等字段请根据你的 `config.yml` 设置（若禁用或未配置则不启动）。
-
-**兼容性与要求**
-- 运行环境：Paper/Spigot 1.16+（推荐 1.18+）。
-- 依赖（可选）：PlaceholderAPI。
-- 构建环境：JDK 17 与 Gradle Wrapper。
-
-**从源码构建**
-- 在项目根目录执行：``./gradlew build -x test``
-- 构建产物位于：`build/libs/SignInPlus-<version>.jar`
-
-**迁移与颜色码说明**
-- 配置示例已统一使用 `§` 颜色码；如仍使用 `&`，仅 `message_prefix` 会自动转换，其它奖励文本请手动改为 `§`。
-- 控制台调试输出支持 ANSI 颜色转换（通过内部工具）。
-
-**常见问题**
-- 占位符查询未加入服务器的玩家时，插件会优先使用在线/缓存玩家；离线模式下按离线 UUID 计算；解析失败返回默认值，避免 NPE。
-- 奖励未生效或排行榜为空时，请检查对应配置段是否存在且键名与值合法。
-
-**反馈与贡献**
-- 欢迎提交 Issue 与 PR 来改进插件功能与文档。
+**其他功能**
+- 自动签到：`auto_check_in_on_login.enable` 可在玩家登录时自动签到。
+- 消息前缀：`message_prefix`；统一转换 `&` → `§`。
+- NBT 物品：`[ITEM] <type> <amount> <nbt>` 支持复杂 NBT 内容。
+- 时区：`timezone` 可指定服务器统计时区。
+- 统计：`bState` 与 bStats 集成（可在配置中开关）。
