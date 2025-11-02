@@ -1,9 +1,8 @@
-package cc.vastsea.rewards
+package cc.vastsea.signinplus.rewards
 
-import cc.vastsea.SignInPlus
-import cc.vastsea.storage.Points
-import cc.vastsea.util.ColorUtil
-import me.clip.placeholderapi.libs.kyori.adventure.text.NBTComponent
+import cc.vastsea.signinplus.SignInPlus
+import cc.vastsea.signinplus.storage.Points
+import cc.vastsea.signinplus.util.ColorUtil
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.Sound
@@ -11,7 +10,7 @@ import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
-import java.util.UUID
+import java.util.*
 import kotlin.random.Random
 
 class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) {
@@ -21,7 +20,9 @@ class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) 
         while (i < lines.size) {
             val current = lines[i]
             val raw = if (current is String) current.trim() else null
-            if (raw == null) { i++; continue }
+            if (raw == null) {
+                i++; continue
+            }
 
             if (raw.startsWith("[RANDOM_PICK=")) {
                 val n = raw.substringAfter("[RANDOM_PICK=").substringBefore("]").toIntOrNull() ?: 1
@@ -56,7 +57,9 @@ class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) 
                     var r = Random.nextInt(sum)
                     var picked: String? = null
                     for ((w, act) in weighted) {
-                        if (r < w) { picked = act; break } else r -= w
+                        if (r < w) {
+                            picked = act; break
+                        } else r -= w
                     }
                     picked?.let { scheduleAction(it, player, delayTicks) }
                 }
@@ -97,21 +100,25 @@ class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) 
                 val cmd = action.substringAfter("[COMMAND]").trim().replace("%player_name%", p?.name ?: "")
                 server.dispatchCommand(server.consoleSender, cmd)
             }
+
             action.startsWith("[MESSAGE]") -> {
                 val msg = ColorUtil.ampersandToSection(action.substringAfter("[MESSAGE]").trim())
                 p?.sendMessage(prefix + msg)
             }
+
             action.startsWith("[TITLE]") -> {
                 val parts = action.substringAfter("[TITLE]").trim().split("|", limit = 2)
                 val title = ColorUtil.ampersandToSection(parts.getOrNull(0) ?: "")
                 val sub = ColorUtil.ampersandToSection(parts.getOrNull(1) ?: "")
                 p?.sendTitle(title, sub, 10, 60, 10)
             }
+
             action.startsWith("[BROADCAST]") -> {
                 val raw = action.substringAfter("[BROADCAST]").trim().replace("%player_name%", p?.name ?: "")
                 val msg = ColorUtil.ampersandToSection(raw)
                 server.broadcastMessage(prefix + msg)
             }
+
             action.startsWith("[SOUND]") -> {
                 val args = action.substringAfter("[SOUND]").trim().split(" ")
                 val type = args.getOrNull(0)?.uppercase() ?: return
@@ -120,6 +127,7 @@ class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) 
                 val sound = runCatching { Sound.valueOf(type) }.getOrNull() ?: return
                 p?.playSound(p.location, sound, vol, pitch)
             }
+
             action.startsWith("[EFFECT]") -> {
                 val args = action.substringAfter("[EFFECT]").trim().split(" ")
                 val typeName = args.getOrNull(0)?.uppercase() ?: return
@@ -128,6 +136,7 @@ class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) 
                 val type = PotionEffectType.getByName(typeName) ?: return
                 p?.addPotionEffect(PotionEffect(type, seconds * 20, level - 1))
             }
+
             action.startsWith("[ITEM]") -> {
                 val spec = action.substringAfter("[ITEM]").trim()
                 val parts = spec.split(" ")
@@ -155,6 +164,7 @@ class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) 
                 }
                 p?.inventory?.addItem(stack)
             }
+
             action.startsWith("[POINTS]") -> {
                 val spec = action.substringAfter("[POINTS]").trim()
                 val value = parsePointsValue(spec)
@@ -175,7 +185,8 @@ class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) 
             Bukkit.getUnsafe().modifyItemStack(stack, processedNbt)
         } catch (e: Exception) {
             val reason = e.cause?.message ?: e.message
-            val errorMessage = "Failed to parse item NBT for player ${player?.name}. NBT: '$processedNbt'. Reason: $reason"
+            val errorMessage =
+                "Failed to parse item NBT for player ${player?.name}. NBT: '$processedNbt'. Reason: $reason"
             plugin.logger.warning(errorMessage)
             player?.sendMessage(prefix + "Item NBT parsing failed, see console for details.")
         }
@@ -206,6 +217,7 @@ class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) 
                         value
                     }
                 }
+
                 else -> value
             }
         } catch (e: Exception) {

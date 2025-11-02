@@ -1,8 +1,8 @@
-package cc.vastsea.web
+package cc.vastsea.signinplus.web
 
-import cc.vastsea.storage.Checkins
-import cc.vastsea.storage.PlayerStat
-import cc.vastsea.storage.Points
+import cc.vastsea.signinplus.storage.Checkins
+import cc.vastsea.signinplus.storage.PlayerStat
+import cc.vastsea.signinplus.storage.Points
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpHandler
 import com.sun.net.httpserver.HttpServer

@@ -1,7 +1,7 @@
-package cc.vastsea.rewards
+package cc.vastsea.signinplus.rewards
 
-import cc.vastsea.SignInPlus
-import cc.vastsea.util.ConsoleColor
+import cc.vastsea.signinplus.SignInPlus
+import cc.vastsea.signinplus.util.ConsoleColor
 
 class DebugLogger(private val plugin: SignInPlus) {
     private val isDebug = plugin.config.getBoolean("debug", false)

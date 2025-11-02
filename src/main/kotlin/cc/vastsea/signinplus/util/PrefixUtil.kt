@@ -1,4 +1,4 @@
-package cc.vastsea.util
+package cc.vastsea.signinplus.util
 
 import org.bukkit.plugin.java.JavaPlugin
 

@@ -1,10 +1,10 @@
-package cc.vastsea
+package cc.vastsea.signinplus
 
-import cc.vastsea.util.PrefixUtil
-import cc.vastsea.storage.Checkins
-import cc.vastsea.storage.CorrectionSlips
-import cc.vastsea.storage.PlayerStat
-import cc.vastsea.storage.Points
+import cc.vastsea.signinplus.util.PrefixUtil
+import cc.vastsea.signinplus.storage.Checkins
+import cc.vastsea.signinplus.storage.CorrectionSlips
+import cc.vastsea.signinplus.storage.PlayerStat
+import cc.vastsea.signinplus.storage.Points
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender

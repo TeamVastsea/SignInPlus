@@ -1,8 +1,8 @@
-package cc.vastsea
+package cc.vastsea.signinplus
 
-import cc.vastsea.storage.CorrectionSlips
-import cc.vastsea.storage.Points
-import cc.vastsea.storage.Checkins
+import cc.vastsea.signinplus.storage.CorrectionSlips
+import cc.vastsea.signinplus.storage.Points
+import cc.vastsea.signinplus.storage.Checkins
 import me.clip.placeholderapi.expansion.PlaceholderExpansion
 import org.bukkit.Bukkit
 import org.bukkit.OfflinePlayer

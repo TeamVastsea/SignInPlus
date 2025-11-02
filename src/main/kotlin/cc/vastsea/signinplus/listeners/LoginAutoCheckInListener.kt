@@ -1,7 +1,7 @@
-package cc.vastsea.listeners
+package cc.vastsea.signinplus.listeners
 
-import cc.vastsea.SignInPlus
-import cc.vastsea.storage.Checkins
+import cc.vastsea.signinplus.SignInPlus
+import cc.vastsea.signinplus.storage.Checkins
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent

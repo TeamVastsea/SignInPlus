@@ -1,4 +1,4 @@
-package cc.vastsea.util
+package cc.vastsea.signinplus.util
 
 object ColorUtil {
     /**

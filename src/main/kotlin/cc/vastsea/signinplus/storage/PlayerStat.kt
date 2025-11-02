@@ -1,6 +1,6 @@
-package cc.vastsea.storage
+package cc.vastsea.signinplus.storage
 
-import cc.vastsea.SignInPlus
+import cc.vastsea.signinplus.SignInPlus
 import java.util.UUID
 
 data class PlayerStat(

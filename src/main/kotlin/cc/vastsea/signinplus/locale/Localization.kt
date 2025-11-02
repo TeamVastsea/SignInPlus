@@ -1,10 +1,9 @@
-package cc.vastsea.locale
+package cc.vastsea.signinplus.locale
 
-import cc.vastsea.util.ColorUtil
+import cc.vastsea.signinplus.util.ColorUtil
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
-import java.util.Locale
 
 class Localization(private val plugin: JavaPlugin) {
     var locale: String = "en_US"

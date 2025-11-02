@@ -1,24 +1,14 @@
-package cc.vastsea.rewards
+package cc.vastsea.signinplus.rewards
 
-import cc.vastsea.util.PrefixUtil
-import cc.vastsea.SignInPlus
-import cc.vastsea.storage.Checkins
-import cc.vastsea.storage.ClaimedRewards
-import cc.vastsea.storage.Points
-import cc.vastsea.storage.SpecialDateClaims
-import org.bukkit.Bukkit
-import org.bukkit.Material
-
-import org.bukkit.Sound
-import org.bukkit.entity.Player
-import org.bukkit.inventory.ItemStack
-import org.bukkit.potion.PotionEffect
-import org.bukkit.potion.PotionEffectType
+import cc.vastsea.signinplus.SignInPlus
+import cc.vastsea.signinplus.storage.Checkins
+import cc.vastsea.signinplus.storage.ClaimedRewards
+import cc.vastsea.signinplus.storage.SpecialDateClaims
+import cc.vastsea.signinplus.util.PrefixUtil
 import java.time.LocalDate
-import java.util.UUID
-import kotlin.random.Random
+import java.util.*
 
-class RewardExecutor(private val plugin: cc.vastsea.SignInPlus) {
+class RewardExecutor(private val plugin: SignInPlus) {
     private val prefix = PrefixUtil.fromConfig(plugin)
     private val logger = DebugLogger(plugin)
     private val actionsRunner = ActionsRunner(plugin, prefix)
@@ -71,7 +61,12 @@ class RewardExecutor(private val plugin: cc.vastsea.SignInPlus) {
             val isExact = date.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))
             val isYearly = date.matches(Regex("\\*-\\d{2}-\\d{2}"))
             val isMonthly = date.matches(Regex("\\*-\\*-\\d{2}"))
-            val isWeekday = listOf("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday").any { it.equals(date, true) }
+            val isWeekday = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday").any {
+                it.equals(
+                    date,
+                    true
+                )
+            }
 
             val match = when {
                 // 每年的某一天: *-MM-dd
@@ -95,12 +90,24 @@ class RewardExecutor(private val plugin: cc.vastsea.SignInPlus) {
                     continue
                 }
                 // 允许一次领取，并累计次数
-                logDebug("Granting special date '&a$date&r' to ${playerLabel(player)} (count &a${currentTimes + 1}/$limit&r). Actions: &c${actions.joinToString(", ")}")
+                logDebug(
+                    "Granting special date '&a$date&r' to ${playerLabel(player)} (count &a${currentTimes + 1}/$limit&r). Actions: &c${
+                        actions.joinToString(
+                            ", "
+                        )
+                    }"
+                )
                 runActionLines(actions, player)
                 SpecialDateClaims.increment(player, date)
             } else {
                 // 精确日期仅当天一次，不需要次数限制
-                logDebug("Granting special date '&a$date&r' to ${playerLabel(player)} (exact date). Actions: &c${actions.joinToString(", ")}")
+                logDebug(
+                    "Granting special date '&a$date&r' to ${playerLabel(player)} (exact date). Actions: &c${
+                        actions.joinToString(
+                            ", "
+                        )
+                    }"
+                )
                 runActionLines(actions, player)
             }
         }
@@ -121,11 +128,21 @@ class RewardExecutor(private val plugin: cc.vastsea.SignInPlus) {
         val eligible = list.filter { it.containsKey("times") }
             .mapNotNull { m ->
                 val threshold = m["times"] as? Int ?: return@mapNotNull null
-                if (totalDays >= threshold && !ClaimedRewards.hasClaimedTotalReward(player, threshold)) threshold to m else null
+                if (totalDays >= threshold && !ClaimedRewards.hasClaimedTotalReward(
+                        player,
+                        threshold
+                    )
+                ) threshold to m else null
             }
         eligible.forEach { (threshold, rewardMap) ->
             val actions = (rewardMap["actions"] as? List<*>) ?: emptyList<Any>()
-            logDebug("Granting cumulative reward for &a$threshold &rdays to ${playerLabel(player)}. Actions: &c${actions.joinToString(", ")}")
+            logDebug(
+                "Granting cumulative reward for &a$threshold &rdays to ${playerLabel(player)}. Actions: &c${
+                    actions.joinToString(
+                        ", "
+                    )
+                }"
+            )
             runActionLines(actions, player)
             if (!force) {
                 ClaimedRewards.markClaimedTotalReward(player, threshold)
@@ -161,11 +178,21 @@ class RewardExecutor(private val plugin: cc.vastsea.SignInPlus) {
         val eligible = list.filter { it.containsKey("times") }
             .mapNotNull { m ->
                 val threshold = m["times"] as? Int ?: return@mapNotNull null
-                if (streakDays >= threshold && !ClaimedRewards.hasClaimedStreakReward(player, threshold)) threshold to m else null
+                if (streakDays >= threshold && !ClaimedRewards.hasClaimedStreakReward(
+                        player,
+                        threshold
+                    )
+                ) threshold to m else null
             }
         eligible.forEach { (threshold, rewardMap) ->
             val actions = (rewardMap["actions"] as? List<*>) ?: emptyList<Any>()
-            logDebug("Granting streak reward for &a$threshold &rdays to ${playerLabel(player)}. Actions: &c${actions.joinToString(", ")}")
+            logDebug(
+                "Granting streak reward for &a$threshold &rdays to ${playerLabel(player)}. Actions: &c${
+                    actions.joinToString(
+                        ", "
+                    )
+                }"
+            )
             runActionLines(actions, player)
             if (!force) {
                 ClaimedRewards.markClaimedStreakReward(player, threshold)
@@ -185,7 +212,13 @@ class RewardExecutor(private val plugin: cc.vastsea.SignInPlus) {
             val r = m["rank"] as? Int ?: continue
             if (rank == r) {
                 val actions = m["actions"] as? List<*> ?: continue
-                logDebug("Granting top reward for rank &a$rank &rto ${playerLabel(player)}. Actions: &c${actions.joinToString(", ")}")
+                logDebug(
+                    "Granting top reward for rank &a$rank &rto ${playerLabel(player)}. Actions: &c${
+                        actions.joinToString(
+                            ", "
+                        )
+                    }"
+                )
                 runActionLines(actions, player)
                 break
             }
@@ -198,7 +231,15 @@ class RewardExecutor(private val plugin: cc.vastsea.SignInPlus) {
         val isExactInput = dateStr.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))
         val isYearlyInput = dateStr.matches(Regex("\\*-\\d{2}-\\d{2}"))
         val isMonthlyInput = dateStr.matches(Regex("\\*-\\*-\\d{2}"))
-        val isWeekdayInput = listOf("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday").any { it.equals(dateStr, true) }
+        val isWeekdayInput = listOf(
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday"
+        ).any { it.equals(dateStr, true) }
 
         // debug 模式：如果传入的是配置里的模式（如 *-*-14 或 Thursday），直接匹配相同配置项，不校验今天
         for (m in specials) {
@@ -224,11 +265,23 @@ class RewardExecutor(private val plugin: cc.vastsea.SignInPlus) {
                     logDebug("[Debug] Special date '&a$date&r' reached limit for ${playerLabel(player)} (&c$prev/$limit&r), skipping.")
                     continue
                 }
-                logDebug("[Debug] Granting special date '&a$date&r' to ${playerLabel(player)} (count &a${prev + 1}/$limit&r). Actions: &c${actions.joinToString(", ")}")
+                logDebug(
+                    "[Debug] Granting special date '&a$date&r' to ${playerLabel(player)} (count &a${prev + 1}/$limit&r). Actions: &c${
+                        actions.joinToString(
+                            ", "
+                        )
+                    }"
+                )
                 runActionLines(actions, player)
                 // Debug: 不记录或修改数据库中的特殊日期次数
             } else {
-                logDebug("[Debug] Granting special date '&a$date&r' to ${playerLabel(player)} (exact date). Actions: &c${actions.joinToString(", ")}")
+                logDebug(
+                    "[Debug] Granting special date '&a$date&r' to ${playerLabel(player)} (exact date). Actions: &c${
+                        actions.joinToString(
+                            ", "
+                        )
+                    }"
+                )
                 runActionLines(actions, player)
             }
         }
@@ -237,7 +290,13 @@ class RewardExecutor(private val plugin: cc.vastsea.SignInPlus) {
     private fun runActionsFromConfig(path: String, player: UUID) {
         val actions = plugin.config.getStringList(path)
         if (actions.isEmpty()) return
-        logDebug("Running actions from config path '&a$path&r' for player ${playerLabel(player)}. Actions: &c${actions.joinToString(", ")}")
+        logDebug(
+            "Running actions from config path '&a$path&r' for player ${playerLabel(player)}. Actions: &c${
+                actions.joinToString(
+                    ", "
+                )
+            }"
+        )
         actionsRunner.runActionLines(actions, player)
     }
 

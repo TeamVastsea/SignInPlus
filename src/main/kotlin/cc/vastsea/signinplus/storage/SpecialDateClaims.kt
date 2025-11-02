@@ -1,7 +1,7 @@
-package cc.vastsea.storage
+package cc.vastsea.signinplus.storage
 
-import cc.vastsea.SignInPlus.Companion.now
-import cc.vastsea.SignInPlus.Companion.today
+import cc.vastsea.signinplus.SignInPlus.Companion.now
+import cc.vastsea.signinplus.SignInPlus.Companion.today
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.javatime.datetime
