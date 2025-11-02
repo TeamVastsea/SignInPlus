@@ -1,5 +1,5 @@
 name: SignInPlus
-main: cc.vastsea.SignInPlus
+main: cc.vastsea.signinplus.SignInPlus
 version: ${version}
 api: spigot
 api-version: '1.20'
