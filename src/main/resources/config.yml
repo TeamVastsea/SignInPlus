@@ -31,7 +31,7 @@ database:
 # - 目前支持 zh_CN / en_US (WIP)
 # - 键名: language
 #########################################################
-locale: zh_CN
+locale: en_US
 
 ######################################################### 
 # 默认签到奖励 
@@ -216,7 +216,7 @@ auto_check_in_on_login:
 # bState: 是否启用bState统计
 # debug: 是否启用调试模式 (输出更多日志)
 #########################################################
-message_prefix: "§7[§a签到Plus§7] "
+message_prefix: "§7[§aSignInPlus§7] "
 timezone: "Asia/Shanghai"
 bState: true
 debug: false
