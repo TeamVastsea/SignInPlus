@@ -213,12 +213,10 @@ auto_check_in_on_login:
 # 插件基础配置
 # message_prefix: 插件消息前缀
 # timezone: 详情可见 https://www.zeitverschiebung.net/cn/all-time-zones.html
-# language: 多语言 (zh_CN / en_US)  (WIP)
 # bState: 是否启用bState统计
 # debug: 是否启用调试模式 (输出更多日志)
 #########################################################
 message_prefix: "§7[§a签到Plus§7] "
 timezone: "Asia/Shanghai"
-language: zh_CN
 bState: true
 debug: false
