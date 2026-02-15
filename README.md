@@ -3,6 +3,7 @@
 **插件介绍**
 - 面向 Paper/Spigot 的现代化每日签到插件：支持默认奖励、累计签、连签、特殊日期与排行榜奖励；内置补签卡、积分、PAPI、可选 Web API。
 - 颜色码友好；消息前缀可配；多语言内置。
+- 版本：1.3.7 | 项目组：cc.vastsea
 - 作者：[Snowball_233](https://github.com/SnowballXueQiu)，[zrll_](https://github.com/zrll12)
 
 **配置与文档**
@@ -58,28 +59,40 @@
 - `/signinplus top total|streak`：查看排行榜；权限 `signinplus.user`。
 - `/signinplus debug trigger ...`：触发奖励用于验证；权限 `signinplus.admin` 且 `debug: true`。
 
-**数据库**
-- 支持：`sqlite` / `mysql` / `postgresql`。
-- 配置键：`database.type`、`database.url`、`database.username`、`database.password`。
+**数据库支持**
+- 支持数据库：`sqlite` / `mysql` / `postgresql`
+- 配置键：`database.type`、`database.url`、`database.username`、`database.password`
+- 驱动版本：
+  - SQLite JDBC：3.46.0.0
+  - MySQL Connector/J：9.2.0
+  - PostgreSQL JDBC：42.7.5
+  - 连接池 HikariCP：6.2.1
+  - ORM 框架 Exposed：0.58.0
 - 初始化：
-  - SQLite：自动创建 `plugins/SignInPlus/signinplus.db`。
-  - MySQL/PostgreSQL：启动时尝试创建数据库（需账户具备建库权限）。
+  - SQLite：自动创建 `plugins/SignInPlus/signinplus.db`
+  - MySQL/PostgreSQL：启动时尝试创建数据库（需账户具备建库权限）
 
 **构建与测试**
-- 构建方式（产物位于 `build/libs`）：
-  - 整包：`./gradlew shadowJar`（默认，兼容性最佳）。
-  - 只带 SQLite：`./gradlew shadowJarLite`（剔除 MySQL/PostgreSQL 驱动，体积更小）。
-  - 不带 SQLite：`./gradlew shadowJarNoSqlite`（用于仅部署 MySQL/PostgreSQL）。
-- 本地测试：`./gradlew runServer` 启动 Paper 1.21 测试服（可用于快速验证指令与奖励）。
+- 推荐构建方式：`./gradlew build`（产物位于 `build/libs`）
+- 产物说明：`./gradlew build` 会同时生成两种 JAR
+  - `*-all.jar`：包含全部依赖，直接部署（Shadow 全量包）
+  - 无 `-all` 后缀：精简包，依赖由 Spigot 在加载时自动下载
+- 其他构建：只生成全量包 `./gradlew shadowJar`
+- 本地测试：`./gradlew runServer` 启动 Paper 1.21 测试服（可用于快速验证指令与奖励）
+
+**技术栈**
+- Kotlin：2.2.20
+- 目标 JVM：21
+- Gradle 插件：Shadow 9.2.2, xyz.jpenilla.run-paper 2.3.1
 
 **兼容性**
-- 服务器：Paper/Spigot `1.20+`（推荐 `1.20.4+ / 1.21`）。
+- 服务器：Paper/Spigot `1.20.4+`（测试版本：1.21）
 - Java：服务器运行环境 `Java 21+`
-- 依赖：建议安装 PlaceholderAPI；需要安装 kotlin 插件（`depend: Kotlin`）。
+- 依赖：PlaceholderAPI 2.11.5（推荐安装）；Kotlin runtime（自动包含）
 
 **其他功能**
 - 自动签到：`auto_check_in_on_login.enable` 可在玩家登录时自动签到。
 - 消息前缀：`message_prefix`；统一转换 `&` → `§`。
 - NBT 物品：`[ITEM] <type> <amount> <nbt>` 支持复杂 NBT 内容。
 - 时区：`timezone` 可指定服务器统计时区。
-- 统计：`bState` 与 bStats 集成（可在配置中开关）。
+- 统计：集成 bStats 3.0.2（可在配置中开关）
