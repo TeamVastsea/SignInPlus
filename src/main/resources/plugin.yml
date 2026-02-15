@@ -27,3 +27,13 @@ permissions:
   signinplus.admin:
     description: Administer the sign-in system (force check-in, make-up for others, reload)
     default: op
+# Keep the following 9 lines at the end so they will be removed in shadow jar
+libraries:
+  - org.xerial:sqlite-jdbc:3.46.0.0
+  - org.bstats:bstats-bukkit:3.0.2
+  - org.jetbrains.exposed:exposed-core:0.58.0
+  - org.jetbrains.exposed:exposed-jdbc:0.58.0
+  - org.jetbrains.exposed:exposed-java-time:0.58.0
+  - org.postgresql:postgresql:42.7.5
+  - com.mysql:mysql-connector-j:9.2.0
+  - com.zaxxer:HikariCP:6.2.1
