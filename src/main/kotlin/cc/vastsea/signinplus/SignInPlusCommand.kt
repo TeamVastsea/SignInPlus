@@ -479,10 +479,23 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
     }
 
     private fun sendHelp(sender: CommandSender) {
-        // zh_CN does not provide the help.* keys; present a minimal help using existing keys
-        sender.sendMessage("$prefix${loc("commands.usage", mapOf("usage" to "/signin | /status | /make_up | /points | /top | /correction_slip"))}")
-        sender.sendMessage("$prefix${loc("commands.top_total")}")
-        sender.sendMessage("$prefix${loc("commands.top_streak")}")
+        val canAdmin = sender.hasPermission("signinplus.admin") || sender.isOp
+        sender.sendMessage("$prefix§e${loc("commands.help.title")}")
+        if (sender.hasPermission("signinplus.user")) {
+            sender.sendMessage("$prefix${loc("commands.help.signin")}")
+            sender.sendMessage("$prefix${loc("commands.help.status")}")
+            sender.sendMessage("$prefix${loc("commands.help.points")}")
+            sender.sendMessage("$prefix${loc("commands.help.top")}")
+        }
+        if (sender.hasPermission("signinplus.make_up")) {
+            sender.sendMessage("$prefix${loc("commands.help.make_up")}")
+        }
+        if (canAdmin) {
+            sender.sendMessage("$prefix${loc("commands.help.correction_slip")}")
+            sender.sendMessage("$prefix${loc("commands.help.force_check_in")}")
+            sender.sendMessage("$prefix${loc("commands.help.reload")}")
+            sender.sendMessage("$prefix${loc("commands.help.debug")}")
+        }
     }
 
     private fun handleDebugTrigger(sender: CommandSender, args: List<String>) {
@@ -639,6 +652,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
         args: Array<out String>
     ): MutableList<String> {
         val out = mutableListOf<String>()
+        val canAdmin = sender.hasPermission("signinplus.admin") || sender.isOp
         if (args.size == 1) {
             val base = listOf(
                 "help",
@@ -651,19 +665,28 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                 "top",
                 "debug"
             )
-            out.addAll(base.filter { it.startsWith(args[0], ignoreCase = true) })
+            val allowed = base.filter { cmd ->
+                when (cmd) {
+                    "reload", "force_check_in", "correction_slip", "debug" -> canAdmin
+                    "make_up" -> sender.hasPermission("signinplus.make_up")
+                    "status", "points", "top" -> sender.hasPermission("signinplus.user")
+                    "help" -> true
+                    else -> false
+                }
+            }
+            out.addAll(allowed.filter { it.startsWith(args[0], ignoreCase = true) })
             return out
         }
 
         when (args[0].lowercase()) {
             "status" -> {
-                if (args.size == 2) {
+                if (args.size == 2 && canAdmin) {
                     out.addAll(onlinePlayerNames().filter { it.startsWith(args[1], ignoreCase = true) })
                 }
             }
 
             "top" -> {
-                if (args.size == 2) out.addAll(listOf("total", "streak").filter {
+                if (args.size == 2 && sender.hasPermission("signinplus.user")) out.addAll(listOf("total", "streak").filter {
                     it.startsWith(
                         args[1],
                         ignoreCase = true
@@ -672,6 +695,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             }
 
             "debug" -> {
+                if (!canAdmin) return out
                 if (args.size == 2) {
                     out.addAll(listOf("trigger").filter { it.startsWith(args[1], ignoreCase = true) })
                 }
@@ -721,34 +745,42 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             }
 
             "points" -> {
+                if (!sender.hasPermission("signinplus.user")) return out
                 if (args.size == 2) {
-                    val subs = listOf("set", "decrease", "clear", "add")
-                    out.addAll(subs.filter { it.startsWith(args[1], ignoreCase = true) })
-                    out.addAll(onlinePlayerNames().filter { it.startsWith(args[1], ignoreCase = true) })
+                    if (canAdmin) {
+                        val subs = listOf("set", "decrease", "clear", "add")
+                        out.addAll(subs.filter { it.startsWith(args[1], ignoreCase = true) })
+                        out.addAll(onlinePlayerNames().filter { it.startsWith(args[1], ignoreCase = true) })
+                    }
                 } else if (args.size == 3) {
-                    when (args[1].lowercase()) {
-                        "set", "decrease", "add" -> out.addAll(onlinePlayerNames().filter {
-                            it.startsWith(
-                                args[2],
-                                ignoreCase = true
-                            )
-                        })
+                    if (canAdmin) {
+                        when (args[1].lowercase()) {
+                            "set", "decrease", "add" -> out.addAll(onlinePlayerNames().filter {
+                                it.startsWith(
+                                    args[2],
+                                    ignoreCase = true
+                                )
+                            })
 
-                        "clear" -> out.addAll(onlinePlayerNames().filter { it.startsWith(args[2], ignoreCase = true) })
+                            "clear" -> out.addAll(onlinePlayerNames().filter { it.startsWith(args[2], ignoreCase = true) })
+                        }
                     }
                 } else if (args.size == 4) {
-                    when (args[1].lowercase()) {
-                        "set", "decrease", "add" -> out.addAll(suggestNumbers().filter {
-                            it.startsWith(
-                                args[3],
-                                ignoreCase = true
-                            )
-                        })
+                    if (canAdmin) {
+                        when (args[1].lowercase()) {
+                            "set", "decrease", "add" -> out.addAll(suggestNumbers().filter {
+                                it.startsWith(
+                                    args[3],
+                                    ignoreCase = true
+                                )
+                            })
+                        }
                     }
                 }
             }
 
             "correction_slip" -> {
+                if (!canAdmin) return out
                 when (args.size) {
                     2 -> out.addAll(listOf("give", "decrease", "clear").filter {
                         it.startsWith(
@@ -763,25 +795,35 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             }
 
             "make_up" -> {
+                if (!sender.hasPermission("signinplus.make_up")) return out
                 when (args.size) {
                     2 -> out.addAll(suggestNumbers().filter { it.startsWith(args[1], ignoreCase = true) })
                     3 -> {
-                        out.addAll(onlinePlayerNames().filter { it.startsWith(args[2], ignoreCase = true) })
-                        out.add("force")
+                        if (canAdmin) {
+                            out.addAll(onlinePlayerNames().filter { it.startsWith(args[2], ignoreCase = true) })
+                            out.add("force")
+                        }
                     }
 
                     4 -> {
-                        if (args[2].equals("force", ignoreCase = true)) {
-                            // No suggestions after force
-                        } else {
-                            out.add("force")
+                        if (canAdmin) {
+                            if (args[2].equals("force", ignoreCase = true)) {
+                                // No suggestions after force
+                            } else {
+                                out.add("force")
+                            }
                         }
                     }
                 }
             }
 
             "force_check_in" -> {
-                if (args.size == 2) out.addAll(onlinePlayerNames().filter { it.startsWith(args[1], ignoreCase = true) })
+                if (canAdmin && args.size == 2) out.addAll(onlinePlayerNames().filter {
+                    it.startsWith(
+                        args[1],
+                        ignoreCase = true
+                    )
+                })
             }
         }
 
