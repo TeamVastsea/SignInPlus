@@ -5,6 +5,7 @@ commands:
   sign_in_success: "&aSign in successful!"
   force_sign_in_success: "&aForce signed in {target}"
   config_reloaded: "&aConfiguration reloaded and Web API restarted (if enabled)"
+  debug_triggered: "&aDebug trigger succeeded"
   your_points: "Your points: {points}"
   points_must_be_number: "&cPoints must be a number, e.g. 1 or 1.25"
   set_points_success: "&aSet {target}'s points to {points}"

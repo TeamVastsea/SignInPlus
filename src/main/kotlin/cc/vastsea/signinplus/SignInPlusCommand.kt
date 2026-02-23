@@ -472,11 +472,13 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             return
         }
 
-    // No specific zh_CN key for triggering; show a generic positive info using config_reloaded as closest available success message
-    sender.sendMessage("$prefix§a${loc("commands.config_reloaded")}")
+        var success = false
 
         when (type) {
-            "default" -> plugin.rewardExecutor.runDefaultRewards(player.uniqueId)
+            "default" -> {
+                plugin.rewardExecutor.runDefaultRewards(player.uniqueId)
+                success = true
+            }
             "cumulative" -> {
                 val days = value?.toIntOrNull()
                 if (days == null) {
@@ -496,6 +498,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     return
                 }
                 plugin.rewardExecutor.runCumulativeRewards(days, player.uniqueId, true)
+                success = true
             }
 
             "streak" -> {
@@ -517,6 +520,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     return
                 }
                 plugin.rewardExecutor.runStreakRewards(days, player.uniqueId, true)
+                success = true
             }
 
             "top" -> {
@@ -542,6 +546,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     return
                 }
                 plugin.rewardExecutor.runTopRewards(rank, player.uniqueId, true)
+                success = true
             }
 
             "special_dates" -> {
@@ -581,11 +586,11 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                         return
                     }
                     plugin.rewardExecutor.runSpecialDateRewards(value, player.uniqueId, prev)
-                    sender.sendMessage("$prefix§a${loc("commands.config_reloaded")}")
-                    return
+                    success = true
+                } else {
+                    plugin.rewardExecutor.runSpecialDateRewards(value, player.uniqueId, null)
+                    success = true
                 }
-
-                plugin.rewardExecutor.runSpecialDateRewards(value, player.uniqueId, null)
             }
 
             else -> {
@@ -595,7 +600,9 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
         }
 
         // Use a generic positive message (closest existing key)
-        sender.sendMessage("$prefix§a${loc("commands.config_reloaded")}")
+        if (success) {
+            sender.sendMessage("$prefix§a${loc("commands.debug_triggered")}")
+        }
     }
 
     override fun onTabComplete(

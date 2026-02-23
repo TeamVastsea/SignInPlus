@@ -3,6 +3,7 @@ package cc.vastsea.signinplus.rewards
 import cc.vastsea.signinplus.SignInPlus
 import cc.vastsea.signinplus.storage.Points
 import cc.vastsea.signinplus.util.ColorUtil
+import me.clip.placeholderapi.PlaceholderAPI
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.Sound
@@ -94,33 +95,34 @@ class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) 
     private fun runSingleAction(action: String, player: java.util.UUID) {
         val server = plugin.server
         val p = server.getPlayer(player)
+        val resolved = applyPlaceholders(action, player)
 
         when {
-            action.startsWith("[COMMAND]") -> {
-                val cmd = action.substringAfter("[COMMAND]").trim().replace("%player_name%", p?.name ?: "")
+            resolved.startsWith("[COMMAND]") -> {
+                val cmd = resolved.substringAfter("[COMMAND]").trim()
                 server.dispatchCommand(server.consoleSender, cmd)
             }
 
-            action.startsWith("[MESSAGE]") -> {
-                val msg = ColorUtil.ampersandToSection(action.substringAfter("[MESSAGE]").trim())
+            resolved.startsWith("[MESSAGE]") -> {
+                val msg = ColorUtil.ampersandToSection(resolved.substringAfter("[MESSAGE]").trim())
                 p?.sendMessage(prefix + msg)
             }
 
-            action.startsWith("[TITLE]") -> {
-                val parts = action.substringAfter("[TITLE]").trim().split("|", limit = 2)
+            resolved.startsWith("[TITLE]") -> {
+                val parts = resolved.substringAfter("[TITLE]").trim().split("|", limit = 2)
                 val title = ColorUtil.ampersandToSection(parts.getOrNull(0) ?: "")
                 val sub = ColorUtil.ampersandToSection(parts.getOrNull(1) ?: "")
                 p?.sendTitle(title, sub, 10, 60, 10)
             }
 
-            action.startsWith("[BROADCAST]") -> {
-                val raw = action.substringAfter("[BROADCAST]").trim().replace("%player_name%", p?.name ?: "")
+            resolved.startsWith("[BROADCAST]") -> {
+                val raw = resolved.substringAfter("[BROADCAST]").trim()
                 val msg = ColorUtil.ampersandToSection(raw)
                 server.broadcastMessage(prefix + msg)
             }
 
-            action.startsWith("[SOUND]") -> {
-                val args = action.substringAfter("[SOUND]").trim().split(" ")
+            resolved.startsWith("[SOUND]") -> {
+                val args = resolved.substringAfter("[SOUND]").trim().split(" ")
                 val type = args.getOrNull(0)?.uppercase() ?: return
                 val vol = args.getOrNull(1)?.toFloatOrNull() ?: 1.0f
                 val pitch = args.getOrNull(2)?.toFloatOrNull() ?: 1.0f
@@ -128,8 +130,8 @@ class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) 
                 p?.playSound(p.location, sound, vol, pitch)
             }
 
-            action.startsWith("[EFFECT]") -> {
-                val args = action.substringAfter("[EFFECT]").trim().split(" ")
+            resolved.startsWith("[EFFECT]") -> {
+                val args = resolved.substringAfter("[EFFECT]").trim().split(" ")
                 val typeName = args.getOrNull(0)?.uppercase() ?: return
                 val level = (args.getOrNull(1)?.toIntOrNull() ?: 1).coerceAtLeast(1)
                 val seconds = (args.getOrNull(2)?.toIntOrNull() ?: 5).coerceAtLeast(1)
@@ -137,8 +139,8 @@ class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) 
                 p?.addPotionEffect(PotionEffect(type, seconds * 20, level - 1))
             }
 
-            action.startsWith("[ITEM]") -> {
-                val spec = action.substringAfter("[ITEM]").trim()
+            resolved.startsWith("[ITEM]") -> {
+                val spec = resolved.substringAfter("[ITEM]").trim()
                 val parts = spec.split(" ")
                 var itemKey = parts.getOrNull(0) ?: return
                 val amount = parts.getOrNull(1)?.toIntOrNull() ?: 1
@@ -165,14 +167,28 @@ class ActionsRunner(private val plugin: SignInPlus, private val prefix: String) 
                 p?.inventory?.addItem(stack)
             }
 
-            action.startsWith("[POINTS]") -> {
-                val spec = action.substringAfter("[POINTS]").trim()
+            resolved.startsWith("[POINTS]") -> {
+                val spec = resolved.substringAfter("[POINTS]").trim()
                 val value = parsePointsValue(spec)
                 val cents = kotlin.math.round(value * 100.0)
                 if (p == null) return
                 Points.addPoints(p.uniqueId, cents)
             }
         }
+    }
+
+    private fun applyPlaceholders(action: String, player: UUID): String {
+        val offline = plugin.server.getOfflinePlayer(player)
+        var result = action
+        if (plugin.server.pluginManager.isPluginEnabled("PlaceholderAPI")) {
+            result = runCatching { PlaceholderAPI.setPlaceholders(offline, result) }
+                .getOrElse {
+                    plugin.logger.warning("PlaceholderAPI parse failed: ${it.message}")
+                    result
+                }
+        }
+        val name = offline.name ?: ""
+        return result.replace("%player_name%", name).replace("%player%", name)
     }
 
     private fun applyNbtSafely(stack: ItemStack, nbt: String, force: Boolean, player: Player?) {
