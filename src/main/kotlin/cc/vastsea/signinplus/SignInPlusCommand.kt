@@ -71,6 +71,17 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     return true
                 }
                 val targetName = if (args.size > 1) args[1] else sender.name
+                if (sender is Player) {
+                    if (!sender.hasPermission("signinplus.admin") && !targetName.equals(sender.name, true)) {
+                        sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
+                        return true
+                    }
+                } else {
+                    if (!sender.hasPermission("signinplus.admin")) {
+                        sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
+                        return true
+                    }
+                }
                 val player = plugin.server.getPlayerExact(targetName) ?: return false
                 val stat = PlayerStat(player.uniqueId)
                 val signedToday = Checkins.isSignedIn(player.uniqueId)
@@ -256,6 +267,17 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     else -> {
                         // 兼容：/points <player> 查看某人积分
                         val target = args[1]
+                        if (sender is Player) {
+                            if (!sender.hasPermission("signinplus.admin") && !target.equals(sender.name, true)) {
+                                sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
+                                return true
+                            }
+                        } else {
+                            if (!sender.hasPermission("signinplus.admin")) {
+                                sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
+                                return true
+                            }
+                        }
                         val player = plugin.server.getPlayerExact(target) ?: return false
                         val p = Points.getPoints(player.uniqueId)
                         // zh_CN lacks a direct "other player's points" template with amount.
