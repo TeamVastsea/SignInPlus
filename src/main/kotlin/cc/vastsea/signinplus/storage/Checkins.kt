@@ -183,11 +183,12 @@ object Checkins : Table() {
 
     fun topTotal(limit: Int): List<Pair<UUID, Int>> {
         return transaction {
-            Checkins.select(player, player.countDistinct())
+            val dayCount = Checkins.day.countDistinct()
+            Checkins.select(player, dayCount)
                 .groupBy(Checkins.player)
-                .orderBy(Checkins.player.countDistinct(), SortOrder.DESC)
+                .orderBy(dayCount, SortOrder.DESC)
                 .limit(limit)
-                .map { it[Checkins.player] to it[Checkins.player.countDistinct()].toInt() }
+                .map { it[Checkins.player] to it[dayCount].toInt() }
         }
     }
 
