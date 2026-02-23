@@ -280,10 +280,14 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                         }
                         val player = plugin.server.getPlayerExact(target) ?: return false
                         val p = Points.getPoints(player.uniqueId)
-                        // zh_CN lacks a direct "other player's points" template with amount.
-                        // Use the existing some_one_s_point as a title and then show the amount.
-                        sender.sendMessage("$prefix${loc("commands.some_one_s_point", mapOf("target" to target))}")
-                        sender.sendMessage("$prefix${loc("commands.your_points", mapOf("points" to formatPointsDisplay(p)))}")
+                        sender.sendMessage(
+                            "$prefix${
+                                loc(
+                                    "commands.other_points",
+                                    mapOf("target" to target, "points" to formatPointsDisplay(p))
+                                )
+                            }"
+                        )
                     }
                 }
             }

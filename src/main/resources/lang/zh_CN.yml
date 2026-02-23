@@ -7,6 +7,7 @@ commands:
   config_reloaded: "&a配置已重载并重启 Web API（如启用）"
   debug_triggered: "&a调试触发成功"
   your_points: "你的积分: {points}"
+  other_points: "{target} 的积分是: {points}"
   points_must_be_number: "&c积分必须是数字，例如 1 或 1.25"
   set_points_success: "&a已将 {target} 的积分设置为 {points}"
   clear_points_success: "&a已清除 {target} 的积分"
