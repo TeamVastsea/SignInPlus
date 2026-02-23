@@ -629,6 +629,12 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
         }
 
         when (args[0].lowercase()) {
+            "status" -> {
+                if (args.size == 2) {
+                    out.addAll(onlinePlayerNames().filter { it.startsWith(args[1], ignoreCase = true) })
+                }
+            }
+
             "top" -> {
                 if (args.size == 2) out.addAll(listOf("total", "streak").filter {
                     it.startsWith(
