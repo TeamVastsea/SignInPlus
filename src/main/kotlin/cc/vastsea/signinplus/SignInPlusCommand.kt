@@ -467,7 +467,8 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
         // zh_CN does not define per-line templates for top list; build lines directly
         for (i in 0 until 10) {
             val line = ranked.getOrNull(i)?.let {
-                "§e${i + 1}. ${it.first} - ${it.second}"
+                val name = plugin.server.getOfflinePlayer(it.first).name ?: it.first.toString()
+                "§e${i + 1}. $name - ${it.second}"
             } ?: "§7${i + 1}. —"
             sender.sendMessage("$prefix$line")
         }
