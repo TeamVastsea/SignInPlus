@@ -3,7 +3,7 @@
 **插件介绍**
 - 面向 Paper/Spigot 的现代化每日签到插件：支持默认奖励、累计签、连签、特殊日期与排行榜奖励；内置补签卡、积分、PAPI、可选 Web API。
 - 颜色码友好；消息前缀可配；多语言内置。
-- 版本：1.3.7 | 项目组：cc.vastsea
+- 版本：1.4.0
 - 作者：[Snowball_233](https://github.com/SnowballXueQiu)，[zrll_](https://github.com/zrll12)
 
 **配置与文档**
@@ -12,7 +12,7 @@
 
 **模块一览**
 - 基础签到/首签/连签/累计签
-  - 基础签到：玩家执行 `/signin`（别名：`/checkin`、`/qiandao`、`/qd`）触发 `default.actions`。
+  - 基础签到：玩家执行 `/signin`（别名：`/checkin`、`/qd`）触发 `default.actions`。
   - 首签：可用 `top` 模块配置当日首位签到（`rank: 1`）的额外奖励。
   - 连签与累计签：分别由 `streak` 与 `cumulative` 块定义阈值与奖励，支持多档配置与去重发放。
   - 特殊日期：`special_dates` 支持按具体日期、每年、每月或每周匹配触发，可设重复次数限制。
@@ -48,14 +48,14 @@
   - 用法：`/signinplus debug trigger <default|cumulative|streak|top|special_dates> [previous_value]`（例如 `streak 7`、`top 1`、`special_dates Thursday`）。
 
 **指令详解**
-- `/signin` | `/checkin` | `/qiandao` | `/qd`：玩家签到；权限 `signinplus.user`。
+- `/signin` | `/checkin` | `/qd`：玩家签到；权限 `signinplus.user`。
 - `/signinplus status [player]`：查询状态；权限 `signinplus.user`。
 - `/signinplus reload`：重载配置与语言并重启 Web API；权限 `signinplus.admin`。
 - `/signinplus points set <player> <amount>`：设置积分；权限 `signinplus.admin`。
 - `/signinplus points add|decrease <player> <amount>`：增/扣积分；权限 `signinplus.admin`。
 - `/signinplus points clear <player>`：清空积分；权限 `signinplus.admin`。
 - `/signinplus correction_slip give|decrease|clear <player> [amount]`：管理补签卡；权限 `signinplus.admin`。
-- `/signinplus make_up [cards] [player] [force]`：补签自己或他人；权限 `signinplus.make_up`（他人需 `signinplus.admin`）。
+- `/signinplus make_up [cards] [player] [force]`：补签自己或他人；权限 `signinplus.make_up`（给他人补签需 `signinplus.admin`）。
 - `/signinplus top total|streak`：查看排行榜；权限 `signinplus.user`。
 - `/signinplus debug trigger ...`：触发奖励用于验证；权限 `signinplus.admin` 且 `debug: true`。
 
@@ -86,7 +86,7 @@
 - Gradle 插件：Shadow 9.2.2, xyz.jpenilla.run-paper 2.3.1
 
 **兼容性**
-- 服务器：Paper/Spigot `1.20.4+`（测试版本：1.21）
+- 服务器：Paper/Spigot `1.20+`（测试版本：1.21）
 - Java：服务器运行环境 `Java 21+`
 - 依赖：PlaceholderAPI 2.11.5（推荐安装）；Kotlin runtime（自动包含）
 
