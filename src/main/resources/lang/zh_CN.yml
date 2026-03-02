@@ -20,7 +20,7 @@ commands:
   decrease_slips_success: "&a已扣除 {target} {amount} 张补签卡"
   clear_slips_success: "&a已清除 {target} 的补签卡"
   can_not_make_up_others: "&c你没有权限为他人补签！"
-  make_up_success: "&a已为您补签 ${pastDaysMadeUp.size} 次"
+  make_up_success: "&a已为您补签 {amount} 次"
   refund_slip_success: "&e退回 {refundedCards} 张补签卡。"
   cannot_make_up_today: "&a没有可补签的，已为您今日签到。"
   streak_days: "当前累计签到天数: {days}"

@@ -293,10 +293,6 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             }
 
             "correction_slip" -> {
-                if (!sender.hasPermission("signinplus.admin")) {
-                    sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
-                    return true
-                }
                 if (args.size == 1 && sender is Player) {
                     val stat = PlayerStat(sender.uniqueId)
                     val missedDays = Checkins.getMissedDays(sender.uniqueId)
@@ -307,6 +303,12 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     sender.sendMessage("$prefix${loc("commands.usable_slips", mapOf("usableSlips" to usableSlips.toString()))}")
                     return true
                 }
+
+                if (!sender.hasPermission("signinplus.admin")) {
+                    sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
+                    return true
+                }
+
                 if (args.size >= 2) {
                     when (args[1].lowercase()) {
                         "give" -> {
@@ -402,7 +404,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
 
                     if (pastDaysMadeUp.isNotEmpty()) {
                         // zh_CN provides make_up_success (with embedded count in original template)
-                        sender.sendMessage("$prefix§a${loc("commands.make_up_success")}")
+                        sender.sendMessage("$prefix§a${loc("commands.make_up_success", mapOf("amount" to pastDaysMadeUp.size.toString()))}")
 
                         if (refundedCards > 0) {
                             // zh_CN uses refund_slip_success with {refundedCards}
@@ -667,9 +669,9 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             )
             val allowed = base.filter { cmd ->
                 when (cmd) {
-                    "reload", "force_check_in", "correction_slip", "debug" -> canAdmin
+                    "reload", "force_check_in", "debug" -> canAdmin
                     "make_up" -> sender.hasPermission("signinplus.make_up")
-                    "status", "points", "top" -> sender.hasPermission("signinplus.user")
+                    "status", "points", "top", "correction_slip" -> sender.hasPermission("signinplus.user")
                     "help" -> true
                     else -> false
                 }

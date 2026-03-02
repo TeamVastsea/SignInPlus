@@ -20,7 +20,7 @@ commands:
   decrease_slips_success: "&aRemoved {amount} correction slip(s) from {target}"
   clear_slips_success: "&aCleared {target}'s correction slips"
   can_not_make_up_others: "&cYou do not have permission to make up for others!"
-  make_up_success: "&aMade up ${pastDaysMadeUp.size} times for you"
+  make_up_success: "&aMade up {amount} times for you"
   refund_slip_success: "&eRefunded {refundedCards} correction slip(s)."
   cannot_make_up_today: "&aNo days to make up; signed for today."
   streak_days: "Current total sign-in days: {days}"
