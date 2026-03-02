@@ -534,7 +534,11 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             sender.sendMessage("$prefix${loc("commands.help.gui")}")
         }
         if (checkPermission(sender, "signinplus.make_up")) {
-            sender.sendMessage("$prefix${loc("commands.help.make_up")}")
+            if (canAdmin) {
+                sender.sendMessage("$prefix${loc("commands.help.make_up")}")
+            } else {
+                sender.sendMessage("$prefix${loc("commands.help.make_up_simple")}")
+            }
         }
         if (canAdmin) {
             sender.sendMessage("$prefix${loc("commands.help.correction_slip")}")
@@ -846,6 +850,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
 
             "make_up" -> {
                 if (!checkPermission(sender, "signinplus.make_up")) return out
+                val canAdmin = checkPermission(sender, "signinplus.admin", false) || sender.isOp
                 when (args.size) {
                     2 -> out.addAll(suggestNumbers().filter { it.startsWith(args[1], ignoreCase = true) })
                     3 -> {

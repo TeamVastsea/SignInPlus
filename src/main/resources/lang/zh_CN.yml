@@ -34,6 +34,7 @@ commands:
     status: "&f/signinplus status [player] &7- 查看签到状态"
     points: "&f/signinplus points [player] &7- 查看积分"
     make_up: "&f/signinplus make_up [cards] [player] [force] &7- 补签"
+    make_up_simple: "&f/signinplus make_up [cards] &7- 补签"
     correction_slip: "&f/signinplus correction_slip <give|decrease|clear> <player> [amount] &7- 管理补签卡"
     top: "&f/signinplus top <total|streak> &7- 查看排行榜"
     force_check_in: "&f/signinplus force_check_in <player> &7- 强制签到（管理员）"

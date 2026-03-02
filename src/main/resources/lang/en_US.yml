@@ -34,6 +34,7 @@ commands:
     status: "&f/signinplus status [player] &7- View sign-in status"
     points: "&f/signinplus points [player] &7- View points"
     make_up: "&f/signinplus make_up [cards] [player] [force] &7- Make up sign-ins"
+    make_up_simple: "&f/signinplus make_up [cards] &7- Make up sign-ins"
     correction_slip: "&f/signinplus correction_slip <give|decrease|clear> <player> [amount] &7- Manage correction slips"
     top: "&f/signinplus top <total|streak> &7- View leaderboard"
     force_check_in: "&f/signinplus force_check_in <player> &7- Force sign-in (admin)"
