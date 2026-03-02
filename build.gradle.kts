@@ -14,6 +14,7 @@ repositories {
     gradlePluginPortal()
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://repo.extendedclip.com/content/repositories/placeholderapi/")
+    maven("https://repo.triumphteam.dev/repository/maven-public/")
 }
 
 dependencies {
@@ -22,6 +23,7 @@ dependencies {
     compileOnly(kotlin("stdlib"))
     implementation("org.xerial:sqlite-jdbc:3.46.0.0")
     implementation("org.bstats:bstats-bukkit:3.0.2")
+    implementation("dev.triumphteam:triumph-gui:3.1.10")
 
     // Database dependencies
     implementation("org.jetbrains.exposed:exposed-core:0.58.0")
@@ -45,6 +47,7 @@ tasks {
 
     shadowJar {
         dependsOn("processResources")
+        relocate("dev.triumphteam.gui", "cc.vastsea.signinplus.lib.gui")
         doFirst {
             val pluginFile = layout.buildDirectory.file("resources/main/plugin.yml").get().asFile
             if (pluginFile.exists()) {

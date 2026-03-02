@@ -39,6 +39,7 @@ commands:
     force_check_in: "&f/signinplus force_check_in <player> &7- Force sign-in (admin)"
     reload: "&f/signinplus reload &7- Reload config (admin)"
     debug: "&f/signinplus debug trigger <type> [value] &7- Trigger rewards (admin)"
+    gui: "&f/signinplus gui &7- Open Sign In GUI"
   status:
     signed_in: "Signed in"
     not_signed_in: "Not signed in"
@@ -50,3 +51,22 @@ commands:
     missing_days: "Missed days: &c{missedDays}"
     correction_slips: "Remaining correction slips: &6{correctionSlips}"
     usable_slips: "Correction slips usable now: &6{usableSlips}"
+gui:
+  title: "Sign In - {year}-{month}"
+  buttons:
+    next: "Next Month"
+    previous: "Previous Month"
+    close: "Close"
+    sign_in: "Click to Sign In"
+    make_up: "Click to Make Up"
+  status:
+    signed: "&aSigned In"
+    missed: "&cMissed"
+    future: "&7Future"
+    today: "&eToday: {day}"
+    day: "&7Day {day}"
+    slips: "&7Slips: &e{amount}"
+  stats:
+    name: "&bYour Stats"
+    streak: "&7Streak: &6{days}"
+    total: "&7Total: &6{days}"

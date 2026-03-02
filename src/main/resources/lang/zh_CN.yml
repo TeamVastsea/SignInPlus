@@ -39,6 +39,7 @@ commands:
     force_check_in: "&f/signinplus force_check_in <player> &7- 强制签到（管理员）"
     reload: "&f/signinplus reload &7- 重载配置（管理员）"
     debug: "&f/signinplus debug trigger <type> [value] &7- 触发奖励（管理员）"
+    gui: "&f/signinplus gui &7- 打开签到界面"
   status:
     signed_in: "已签到"
     not_signed_in: "未签到"
@@ -50,3 +51,22 @@ commands:
     missing_days: "漏签天数: &c{missedDays}"
     correction_slips: "剩余补签卡: &6{correctionSlips}"
     usable_slips: "当前可使用补签卡: &6{usableSlips}"
+gui:
+  title: "签到 - {year}年{month}月"
+  buttons:
+    next: "下个月"
+    previous: "上个月"
+    close: "关闭"
+    sign_in: "点击签到"
+    make_up: "点击补签"
+  status:
+    signed: "&a已签到"
+    missed: "&c未签到"
+    future: "&7未开始"
+    today: "&e今日: {day}"
+    day: "&7{day}日"
+    slips: "&7剩余补签卡: &e{amount}"
+  stats:
+    name: "&b个人数据"
+    streak: "&7连续签到: &6{days}"
+    total: "&7累计签到: &6{days}"

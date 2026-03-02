@@ -33,7 +33,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         if (args.isEmpty()) {
             val alias = label.lowercase()
-            if (alias in listOf("signin", "checkin", "qiandao", "qd") && sender is Player) {
+            if (alias in listOf("signin", "checkin", "qd") && sender is Player) {
                 if (!checkPermission(sender, "signinplus.user")) {
                     sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                     return true
@@ -156,6 +156,18 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                         )
                     }"
                 )
+            }
+
+            "gui" -> {
+                if (sender !is Player) {
+                    sender.sendMessage("$prefix§cOnly players can use GUI.")
+                    return true
+                }
+                if (!checkPermission(sender, "signinplus.user")) {
+                    sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
+                    return true
+                }
+                cc.vastsea.signinplus.gui.SignInGui.open(sender)
             }
 
             "help" -> {
@@ -519,6 +531,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             sender.sendMessage("$prefix${loc("commands.help.status")}")
             sender.sendMessage("$prefix${loc("commands.help.points")}")
             sender.sendMessage("$prefix${loc("commands.help.top")}")
+            sender.sendMessage("$prefix${loc("commands.help.gui")}")
         }
         if (checkPermission(sender, "signinplus.make_up")) {
             sender.sendMessage("$prefix${loc("commands.help.make_up")}")
@@ -697,13 +710,14 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                 "correction_slip",
                 "points",
                 "top",
-                "debug"
+                "debug",
+                "gui"
             )
             val allowed = base.filter { cmd ->
                 when (cmd) {
                     "reload", "force_check_in", "debug" -> canAdmin
                     "make_up" -> checkPermission(sender, "signinplus.make_up")
-                    "status", "points", "top", "correction_slip" -> canUser
+                    "status", "points", "top", "correction_slip", "gui" -> canUser
                     "help" -> true
                     else -> false
                 }
