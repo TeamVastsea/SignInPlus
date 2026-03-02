@@ -3,7 +3,7 @@
 **插件介绍**
 - 面向 Paper/Spigot 的现代化每日签到插件：支持默认奖励、累计签、连签、特殊日期与排行榜奖励；内置补签卡、积分、PAPI、可选 Web API。
 - 颜色码友好；消息前缀可配；多语言内置。
-- 版本：1.4.0
+- 版本：1.5.0
 - 作者：[Snowball_233](https://github.com/SnowballXueQiu)，[zrll_](https://github.com/zrll12)
 
 **配置与文档**
