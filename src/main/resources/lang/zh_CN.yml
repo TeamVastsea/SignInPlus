@@ -1,5 +1,6 @@
 commands:
   usage: "&e用法: {usage}"
+  unknown_command: "&e未知命令。请使用 /signinplus help 查看帮助"
   no_permission: "&c你没有权限执行此命令！"
   already_signed_in: "你今天已经签到过了！"
   sign_in_success: "&a签到成功！"

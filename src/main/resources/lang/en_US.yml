@@ -1,5 +1,6 @@
 commands:
   usage: "&eUsage: {usage}"
+  unknown_command: "&eUnknown command. Use /signinplus help for help."
   no_permission: "&cYou do not have permission to execute this command!"
   already_signed_in: "You have already signed in today!"
   sign_in_success: "&aSign in successful!"

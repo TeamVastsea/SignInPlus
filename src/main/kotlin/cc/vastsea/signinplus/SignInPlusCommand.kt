@@ -491,8 +491,8 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             }
 
             else -> {
-                // Use generic usage when subcommand unknown
-                sender.sendMessage("$prefix§e${loc("commands.usage", mapOf("usage" to "/$label <subcommand>"))}")
+                // Unknown command
+                sender.sendMessage("$prefix§e${loc("commands.unknown_command")}")
             }
         }
         return true
