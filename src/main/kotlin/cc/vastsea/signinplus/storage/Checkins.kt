@@ -110,6 +110,19 @@ object Checkins : Table() {
         return Pair(madeUpDays, refundedCards)
     }
 
+    fun forceSignDate(player: UUID, date: LocalDate) {
+        transaction {
+            if (Checkins.selectAll().where { Checkins.player.eq(player).and { Checkins.day.eq(date) } }.count() > 0) {
+                return@transaction
+            }
+            Checkins.insert {
+                it[Checkins.player] = player
+                it[Checkins.day] = date
+                it[Checkins.time] = java.time.LocalTime.MIN
+            }
+        }
+    }
+
     fun getTotalDays(player: UUID): Int {
         return transaction {
             Checkins.selectAll().where { Checkins.player eq player }

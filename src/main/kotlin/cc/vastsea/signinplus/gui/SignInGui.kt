@@ -3,6 +3,7 @@ package cc.vastsea.signinplus.gui
 import cc.vastsea.signinplus.SignInPlus
 import cc.vastsea.signinplus.storage.Checkins
 import cc.vastsea.signinplus.storage.CorrectionSlips
+import cc.vastsea.signinplus.storage.PluginMeta
 import dev.triumphteam.gui.builder.item.ItemBuilder
 import dev.triumphteam.gui.guis.Gui
 import net.kyori.adventure.text.Component
@@ -61,6 +62,8 @@ object SignInGui {
 
         val canMakeUp = player.hasPermission("signinplus.make_up")
         val slips = if (canMakeUp) CorrectionSlips.getCorrectionSlipAmount(player.uniqueId) else 0
+        
+        val firstLaunchDate = PluginMeta.getFirstLaunchDate()
 
         // Slots 9 to 9 + daysInMonth - 1
         // Requirement: "从1号开始放在第二行第一个" -> Slot 9 (Row 1, Col 0)
@@ -69,11 +72,13 @@ object SignInGui {
             val isSigned = signedDates.contains(date)
             val isToday = date == today
             val isFuture = date.isAfter(today)
+            val isBeforeLaunch = firstLaunchDate != null && date.isBefore(firstLaunchDate)
 
             val material = when {
                 isSigned -> Material.LIME_STAINED_GLASS_PANE
                 isToday -> Material.ORANGE_STAINED_GLASS_PANE 
                 isFuture -> Material.WHITE_STAINED_GLASS_PANE
+                isBeforeLaunch -> Material.GRAY_STAINED_GLASS_PANE
                 else -> Material.RED_STAINED_GLASS_PANE // Missed
             }
 
@@ -84,11 +89,13 @@ object SignInGui {
                 isSigned -> loc("gui.status.signed")
                 isToday -> loc("gui.buttons.sign_in")
                 isFuture -> loc("gui.status.future")
+                isBeforeLaunch -> loc("gui.status.future") // Reuse future or add new status for too early? Using future/unknown
                 else -> loc("gui.status.missed")
             }
 
             // Make up logic
-            if (!isSigned && !isFuture && !isToday && canMakeUp) {
+            val canMakeUpThisDay = !isSigned && !isFuture && !isToday && !isBeforeLaunch && canMakeUp
+            if (canMakeUpThisDay) {
                 status = loc("gui.buttons.make_up")
             }
 
@@ -96,7 +103,7 @@ object SignInGui {
                 .name(Component.text(dayName))
                 .lore(Component.text(status))
 
-            if (!isSigned && !isFuture && !isToday && canMakeUp) {
+            if (canMakeUpThisDay) {
                 item.lore(
                     Component.text(status),
                     Component.text(loc("gui.status.slips", mapOf("amount" to slips.toString())))
@@ -110,12 +117,40 @@ object SignInGui {
                         SignInPlus.instance.server.scheduler.runTask(SignInPlus.instance, Runnable {
                             open(player, yearMonth)
                         })
-                    } else if (!isSigned && !isFuture && !isToday && canMakeUp) {
-                         // Perform make up
-                        player.performCommand("signinplus make_up 1")
-                        SignInPlus.instance.server.scheduler.runTask(SignInPlus.instance, Runnable {
-                            open(player, yearMonth)
-                        })
+                    } else if (canMakeUpThisDay) {
+                         // Perform make up for SPECIFIC DATE
+                         // Command: /signinplus make_up <cards> <player> <force>
+                         // But standard command only makes up the LAST missed day.
+                         // We need a way to make up a SPECIFIC date.
+                         // Standard logic: Checkins.makeUpSign(...) finds missed days from today backwards.
+                         // If we want to support specific day make up, we need to extend Checkins or add a new command parameter/logic.
+                         // Or we can manually insert the record if we are sure (but Checkins.makeUpSign handles logic).
+                         
+                         // The user said: "我点哪天补签到哪天" (Click which day to make up that day).
+                         // We need to implement a new method in Checkins or use a new command.
+                         // Let's implement a new method in Checkins to sign a specific past date if valid.
+                         // And probably a new command argument or just internal call if possible (but GUI calls command usually for permission/consistency).
+                         // Since we are in the same plugin, we can call Checkins/CorrectionSlips directly if we handle permissions here.
+                         
+                         // Logic:
+                         // 1. Check if player has slips (or is admin/force).
+                         // 2. Consume 1 slip.
+                         // 3. Sign that specific date.
+                         // 4. Refund if failed?
+                         
+                         if (slips > 0) {
+                             // Use internal logic directly for specific date
+                             // Deduct slip
+                             CorrectionSlips.decreaseCorrectionSlip(player.uniqueId, 1)
+                             // Sign date
+                             Checkins.forceSignDate(player.uniqueId, date)
+                             // Refresh
+                             SignInPlus.instance.server.scheduler.runTask(SignInPlus.instance, Runnable {
+                                 open(player, yearMonth)
+                             })
+                         } else {
+                             player.sendMessage(loc("commands.no_slips"))
+                         }
                     }
                 }
             
