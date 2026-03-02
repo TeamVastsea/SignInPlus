@@ -24,11 +24,17 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
     private fun suggestNumbers(): List<String> = listOf("1", "2", "3", "5", "10")
     private fun formatPointsDisplay(raw: Double): String = String.format("%.2f", raw / 100.0)
 
+    private fun checkPermission(sender: CommandSender, permission: String, allowAdmin: Boolean = true): Boolean {
+        if (sender.hasPermission(permission)) return true
+        if (allowAdmin && sender.hasPermission("signinplus.admin")) return true
+        return false
+    }
+
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         if (args.isEmpty()) {
             val alias = label.lowercase()
             if (alias in listOf("signin", "checkin", "qiandao", "qd") && sender is Player) {
-                if (!sender.hasPermission("signinplus.user")) {
+                if (!checkPermission(sender, "signinplus.user")) {
                     sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                     return true
                 }
@@ -48,7 +54,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
 
         when (args[0].lowercase()) {
             "force_check_in" -> {
-                if (!sender.hasPermission("signinplus.admin")) {
+                if (!checkPermission(sender, "signinplus.admin", false)) {
                     sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                     return true
                 }
@@ -66,18 +72,18 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             }
 
             "status" -> {
-                if (!sender.hasPermission("signinplus.user")) {
+                if (!checkPermission(sender, "signinplus.user")) {
                     sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                     return true
                 }
                 val targetName = if (args.size > 1) args[1] else sender.name
                 if (sender is Player) {
-                    if (!sender.hasPermission("signinplus.admin") && !targetName.equals(sender.name, true)) {
+                    if (!checkPermission(sender, "signinplus.admin", false) && !targetName.equals(sender.name, true)) {
                         sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                         return true
                     }
                 } else {
-                    if (!sender.hasPermission("signinplus.admin")) {
+                    if (!checkPermission(sender, "signinplus.admin", false)) {
                         sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                         return true
                     }
@@ -157,7 +163,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             }
 
             "reload" -> {
-                if (!sender.hasPermission("signinplus.admin")) {
+                if (!checkPermission(sender, "signinplus.admin", false)) {
                     sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                     return true
                 }
@@ -167,6 +173,10 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
 
             "points" -> {
                 if (args.size == 1 && sender is Player) {
+                    if (!checkPermission(sender, "signinplus.user")) {
+                        sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
+                        return true
+                    }
                     val p = Points.getPoints(sender.uniqueId)
                     sender.sendMessage(
                         "$prefix${
@@ -179,10 +189,15 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     return true
                 }
 
+                if (args.size < 2) {
+                    sender.sendMessage("$prefix${loc("commands.usage", mapOf("usage" to "/$label points <set|clear|decrease|add|player>"))}")
+                    return true
+                }
+
                 val sub = args[1].lowercase()
                 when (sub) {
                     "set" -> {
-                        if (!sender.hasPermission("signinplus.admin")) {
+                        if (!checkPermission(sender, "signinplus.admin", false)) {
                             sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                             return true
                         }
@@ -211,7 +226,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     }
 
                     "clear" -> {
-                        if (!sender.hasPermission("signinplus.admin")) {
+                        if (!checkPermission(sender, "signinplus.admin", false)) {
                             sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                             return true
                         }
@@ -225,7 +240,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     }
 
                     "decrease" -> {
-                        if (!sender.hasPermission("signinplus.admin")) {
+                        if (!checkPermission(sender, "signinplus.admin", false)) {
                             sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                             return true
                         }
@@ -245,7 +260,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     }
 
                     "add" -> {
-                        if (!sender.hasPermission("signinplus.admin")) {
+                        if (!checkPermission(sender, "signinplus.admin", false)) {
                             sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                             return true
                         }
@@ -268,12 +283,12 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                         // 兼容：/points <player> 查看某人积分
                         val target = args[1]
                         if (sender is Player) {
-                            if (!sender.hasPermission("signinplus.admin") && !target.equals(sender.name, true)) {
+                            if (!checkPermission(sender, "signinplus.admin", false) && !target.equals(sender.name, true)) {
                                 sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                                 return true
                             }
                         } else {
-                            if (!sender.hasPermission("signinplus.admin")) {
+                            if (!checkPermission(sender, "signinplus.admin", false)) {
                                 sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                                 return true
                             }
@@ -294,6 +309,10 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
 
             "correction_slip" -> {
                 if (args.size == 1 && sender is Player) {
+                    if (!sender.hasPermission("signinplus.user") && !sender.hasPermission("signinplus.admin")) {
+                        sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
+                        return true
+                    }
                     val stat = PlayerStat(sender.uniqueId)
                     val missedDays = Checkins.getMissedDays(sender.uniqueId)
                     val correctionSlips = stat.correctionSlipAmount
@@ -304,7 +323,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     return true
                 }
 
-                if (!sender.hasPermission("signinplus.admin")) {
+                if (!checkPermission(sender, "signinplus.admin", false)) {
                     sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                     return true
                 }
@@ -352,12 +371,19 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             }
 
             "make_up" -> {
-                if (!sender.hasPermission("signinplus.make_up")) {
+                // Check basic user permission first (unless admin)
+                if (!checkPermission(sender, "signinplus.user")) {
+                    sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
+                    return true
+                }
+                
+                // Then check specific make_up permission (unless admin)
+                if (!checkPermission(sender, "signinplus.make_up")) {
                     sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                     return true
                 }
 
-                val isAdmin = sender.hasPermission("signinplus.admin")
+                val isAdmin = checkPermission(sender, "signinplus.admin", false)
 
                 // Parsing for: /make_up [cards] [player] [force]
                 var cards = 1
@@ -432,15 +458,19 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             }
 
             "top" -> {
+                if (!sender.hasPermission("signinplus.user") && !sender.hasPermission("signinplus.admin")) {
+                    sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
+                    return true
+                }
                 val mode = if (args.size >= 2) args[1].lowercase() else "total"
                 when (mode) {
                     "streak" -> showTop(sender, loc("commands.top_streak"), Checkins.topStreak(10))
-                        else -> showTop(sender, loc("commands.top_total"), Checkins.topTotal(10))
+                    else -> showTop(sender, loc("commands.top_total"), Checkins.topTotal(10))
                 }
             }
 
             "debug" -> {
-                if (!sender.hasPermission("signinplus.admin")) {
+                if (!checkPermission(sender, "signinplus.admin", false)) {
                     sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                     return true
                 }
@@ -481,15 +511,16 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
     }
 
     private fun sendHelp(sender: CommandSender) {
-        val canAdmin = sender.hasPermission("signinplus.admin") || sender.isOp
+        val canAdmin = checkPermission(sender, "signinplus.admin", false) || sender.isOp
+        val canUser = checkPermission(sender, "signinplus.user")
         sender.sendMessage("$prefix§e${loc("commands.help.title")}")
-        if (sender.hasPermission("signinplus.user")) {
+        if (canUser) {
             sender.sendMessage("$prefix${loc("commands.help.signin")}")
             sender.sendMessage("$prefix${loc("commands.help.status")}")
             sender.sendMessage("$prefix${loc("commands.help.points")}")
             sender.sendMessage("$prefix${loc("commands.help.top")}")
         }
-        if (sender.hasPermission("signinplus.make_up")) {
+        if (checkPermission(sender, "signinplus.make_up")) {
             sender.sendMessage("$prefix${loc("commands.help.make_up")}")
         }
         if (canAdmin) {
@@ -654,7 +685,8 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
         args: Array<out String>
     ): MutableList<String> {
         val out = mutableListOf<String>()
-        val canAdmin = sender.hasPermission("signinplus.admin") || sender.isOp
+        val canAdmin = checkPermission(sender, "signinplus.admin", false) || sender.isOp
+        val canUser = checkPermission(sender, "signinplus.user")
         if (args.size == 1) {
             val base = listOf(
                 "help",
@@ -670,8 +702,8 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             val allowed = base.filter { cmd ->
                 when (cmd) {
                     "reload", "force_check_in", "debug" -> canAdmin
-                    "make_up" -> sender.hasPermission("signinplus.make_up")
-                    "status", "points", "top", "correction_slip" -> sender.hasPermission("signinplus.user")
+                    "make_up" -> checkPermission(sender, "signinplus.make_up")
+                    "status", "points", "top", "correction_slip" -> canUser
                     "help" -> true
                     else -> false
                 }
@@ -688,7 +720,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             }
 
             "top" -> {
-                if (args.size == 2 && sender.hasPermission("signinplus.user")) out.addAll(listOf("total", "streak").filter {
+                if (args.size == 2 && canUser) out.addAll(listOf("total", "streak").filter {
                     it.startsWith(
                         args[1],
                         ignoreCase = true
@@ -747,7 +779,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             }
 
             "points" -> {
-                if (!sender.hasPermission("signinplus.user")) return out
+                if (!canUser) return out
                 if (args.size == 2) {
                     if (canAdmin) {
                         val subs = listOf("set", "decrease", "clear", "add")
@@ -782,22 +814,24 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             }
 
             "correction_slip" -> {
-                if (!canAdmin) return out
-                when (args.size) {
-                    2 -> out.addAll(listOf("give", "decrease", "clear").filter {
-                        it.startsWith(
-                            args[1],
-                            ignoreCase = true
-                        )
-                    })
+                if (!canUser) return out
+                if (canAdmin) {
+                    when (args.size) {
+                        2 -> out.addAll(listOf("give", "decrease", "clear").filter {
+                            it.startsWith(
+                                args[1],
+                                ignoreCase = true
+                            )
+                        })
 
-                    3 -> out.addAll(onlinePlayerNames().filter { it.startsWith(args[2], ignoreCase = true) })
-                    4 -> out.addAll(suggestNumbers().filter { it.startsWith(args[3], ignoreCase = true) })
+                        3 -> out.addAll(onlinePlayerNames().filter { it.startsWith(args[2], ignoreCase = true) })
+                        4 -> out.addAll(suggestNumbers().filter { it.startsWith(args[3], ignoreCase = true) })
+                    }
                 }
             }
 
             "make_up" -> {
-                if (!sender.hasPermission("signinplus.make_up")) return out
+                if (!checkPermission(sender, "signinplus.make_up")) return out
                 when (args.size) {
                     2 -> out.addAll(suggestNumbers().filter { it.startsWith(args[1], ignoreCase = true) })
                     3 -> {
@@ -820,12 +854,9 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
             }
 
             "force_check_in" -> {
-                if (canAdmin && args.size == 2) out.addAll(onlinePlayerNames().filter {
-                    it.startsWith(
-                        args[1],
-                        ignoreCase = true
-                    )
-                })
+                if (canAdmin) {
+                    if (args.size == 2) out.addAll(onlinePlayerNames().filter { it.startsWith(args[1], ignoreCase = true) })
+                }
             }
         }
 

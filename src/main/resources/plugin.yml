@@ -19,11 +19,11 @@ commands:
     usage: /signinplus help
 permissions:
   signinplus.user:
-    description: Can use sign-in features (default for players)
-    default: true
+    description: Can use sign-in features
+    default: false
   signinplus.make_up:
-    description: Can use make-up sign (default for players)
-    default: true
+    description: Can use make-up sign
+    default: false
   signinplus.admin:
     description: Administer the sign-in system (force check-in, make-up for others, reload)
     default: op
