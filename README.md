@@ -49,6 +49,7 @@
 
 **指令详解**
 - `/signin` | `/checkin` | `/qd`：玩家签到；权限 `signinplus.user`。
+- `/signinplus gui`：打开签到 GUI；权限 `signinplus.user`。
 - `/signinplus status [player]`：查询状态；权限 `signinplus.user`。
 - `/signinplus reload`：重载配置与语言并重启 Web API；权限 `signinplus.admin`。
 - `/signinplus points set <player> <amount>`：设置积分；权限 `signinplus.admin`。
@@ -73,11 +74,7 @@
   - MySQL/PostgreSQL：启动时尝试创建数据库（需账户具备建库权限）
 
 **构建与测试**
-- 推荐构建方式：`./gradlew build`（产物位于 `build/libs`）
-- 产物说明：`./gradlew build` 会同时生成两种 JAR
-  - `*-all.jar`：包含全部依赖，直接部署（Shadow 全量包）
-  - 无 `-all` 后缀：精简包，依赖由 Spigot 在加载时自动下载
-- 其他构建：只生成全量包 `./gradlew shadowJar`
+- 推荐构建方式：`./gradlew build` 或 `./gradlew shadowJar`（产物位于 `build/libs`）
 - 本地测试：`./gradlew runServer` 启动 Paper 1.21 测试服（可用于快速验证指令与奖励）
 
 **技术栈**

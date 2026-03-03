@@ -21,17 +21,17 @@ dependencies {
     compileOnly("io.papermc.paper:paper-api:1.20.4-R0.1-SNAPSHOT")
     compileOnly("me.clip:placeholderapi:2.11.5")
     compileOnly(kotlin("stdlib"))
-    implementation("org.xerial:sqlite-jdbc:3.46.0.0")
+
     implementation("org.bstats:bstats-bukkit:3.0.2")
     implementation("dev.triumphteam:triumph-gui:3.1.10")
 
-    // Database dependencies
-    implementation("org.jetbrains.exposed:exposed-core:0.58.0")
-    implementation("org.jetbrains.exposed:exposed-jdbc:0.58.0")
-    implementation("org.jetbrains.exposed:exposed-java-time:0.58.0")
-    implementation("org.postgresql:postgresql:42.7.5")
-    implementation("com.mysql:mysql-connector-j:9.2.0")
-    implementation("com.zaxxer:HikariCP:6.2.1")
+    compileOnly("org.xerial:sqlite-jdbc:3.46.0.0")
+    compileOnly("org.jetbrains.exposed:exposed-core:0.58.0")
+    compileOnly("org.jetbrains.exposed:exposed-jdbc:0.58.0")
+    compileOnly("org.jetbrains.exposed:exposed-java-time:0.58.0")
+    compileOnly("org.postgresql:postgresql:42.7.5")
+    compileOnly("com.mysql:mysql-connector-j:9.2.0")
+    compileOnly("com.zaxxer:HikariCP:6.2.1")
 }
 
 kotlin {
@@ -46,16 +46,12 @@ tasks {
     }
 
     shadowJar {
-        dependsOn("processResources")
         relocate("dev.triumphteam.gui", "cc.vastsea.signinplus.lib.gui")
-        doFirst {
-            val pluginFile = layout.buildDirectory.file("resources/main/plugin.yml").get().asFile
-            if (pluginFile.exists()) {
-                val lines = pluginFile.readText().lines()
-                val trimmed = if (lines.size > 9) lines.dropLast(10) else emptyList()
-                pluginFile.writeText(trimmed.joinToString("\n").trimEnd() + "\n")
-            }
-        }
+        relocate("org.bstats", "cc.vastsea.signinplus.lib.bstats")
+
+        exclude("META-INF/*.SF")
+        exclude("META-INF/*.DSA")
+        exclude("META-INF/*.RSA")
     }
 
     runServer {

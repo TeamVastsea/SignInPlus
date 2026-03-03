@@ -17,6 +17,8 @@ class SignInPlus : JavaPlugin() {
     override fun onEnable() {
         // 保存默认配置
         saveDefaultConfig()
+        saveResource("config_zh_CN.yml", false)
+
         instance = this
 
         // 初始化本地化 (从 config.yml 中读取 "locale"，默认 en_US)
