@@ -46,6 +46,7 @@ tasks {
     }
 
     shadowJar {
+        archiveClassifier.set(null as String?)
         relocate("dev.triumphteam.gui", "cc.vastsea.signinplus.lib.gui")
         relocate("org.bstats", "cc.vastsea.signinplus.lib.bstats")
 
