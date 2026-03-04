@@ -15,9 +15,8 @@ class SignInPlus : JavaPlugin() {
     lateinit var rewardExecutor: cc.vastsea.signinplus.rewards.RewardExecutor
 
     override fun onEnable() {
-        // 保存默认配置
-        saveDefaultConfig()
-        saveResource("config_zh_CN.yml", false)
+        // 确保所有资源文件存在
+        ensureResources()
 
         instance = this
 
@@ -29,6 +28,9 @@ class SignInPlus : JavaPlugin() {
         // 初始化存储
         val tz = config.getString("timezone") ?: "Asia/Shanghai"
         zoneId = ZoneId.of(tz)
+        
+        // 初始化/重载数据库连接
+        DatabaseHelper.init()
         transaction(DatabaseHelper.database) { create(Checkins, ClaimedRewards, CorrectionSlips, PluginMeta, Points, SpecialDateClaims) }
         PluginMeta.initFirstLaunchDay()
 
@@ -66,10 +68,19 @@ class SignInPlus : JavaPlugin() {
     }
 
     fun reloadAll() {
+        // 重载配置
+        ensureResources()
+        
         reloadConfig()
         // 重新加载本地化（以便管理员修改 data-folder 下的 lang 文件或更改 config.locale）
         val newLocale = config.getString("locale") ?: localization.locale
         localization.load(newLocale)
+        
+        // 重新初始化数据库（如果文件被删，这里会重新创建；如果配置变更，这里会应用新配置）
+        DatabaseHelper.init()
+        // 确保表结构存在
+        transaction(DatabaseHelper.database) { create(Checkins, ClaimedRewards, CorrectionSlips, PluginMeta, Points, SpecialDateClaims) }
+        
         // 重新创建奖励执行器，应用最新配置（如消息前缀、奖励表）
         rewardExecutor = cc.vastsea.signinplus.rewards.RewardExecutor(this)
 
@@ -98,6 +109,40 @@ class SignInPlus : JavaPlugin() {
         webServer = WebApiServer(address, port, endpoint)
         webServer?.start()
         logger.info("Web API Launched: http://$address:$port$endpoint")
+    }
+
+    private fun ensureResources() {
+        // 检查 config.yml 是否已存在（用于判断是否为首次安装/初始化）
+        val configExists = java.io.File(dataFolder, "config.yml").exists()
+        
+        // 1. 核心配置：如果不存在则创建
+        if (!configExists) {
+            saveDefaultConfig()
+        }
+        
+        // 2. 语言文件：始终检查并补全（防止缺失）
+        val langFiles = listOf("lang/en_US.yml", "lang/zh_CN.yml")
+        for (path in langFiles) {
+            val file = java.io.File(dataFolder, path)
+            if (!file.exists()) {
+                saveResource(path, false)
+                logger.info("Created default language file: $path")
+            }
+        }
+        
+        // 3. 中文配置参考：仅在首次初始化（即 config.yml 之前不存在）时释放
+        // 这样后续重启服务器时，即使用户删除了 config_zh_CN.yml，也不会再次生成
+        if (!configExists) {
+            val cnConfigPath = "config_zh_CN.yml"
+            val cnConfigFile = java.io.File(dataFolder, cnConfigPath)
+            if (!cnConfigFile.exists()) {
+                saveResource(cnConfigPath, false)
+                logger.info("Created reference config: $cnConfigPath")
+            }
+        }
+        
+        // 确保内存中的配置与磁盘文件同步
+        reloadConfig()
     }
 
     companion object {

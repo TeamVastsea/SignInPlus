@@ -26,11 +26,11 @@ database:
   password:
 
 #########################################################
-# Auto sign-in
-# Whether to sign in players automatically on login
+# On login action
+# Notes: Action to perform when players log in
+# Options: signin / open_gui / none
 #########################################################
-auto_check_in_on_login:
-  enable: false
+on_login_action: none
 
 #########################################################
 # Basic settings
@@ -86,7 +86,7 @@ default:
     # 3. ✅ Complex NBT (book): a written book with title, author, and pages
     - '[ITEM] WRITTEN_BOOK 1 {title:"My Story",author:"Steve",pages:["{\"text\":\"Content of the first page.\"}","{\"text\":\"The second page is even better!\"}"]}'
     # 4. ⚠️ Invalid NBT: expected result is a normal stone and a console warning
-    - "[ITEM] STONE 1 {invalid_nbt:true"
+    # - "[ITEM] STONE 1 {invalid_nbt:true}"  # (Maybe cause error in some server implementations so we comment it out)
     # 5. ⚠️ Force fix: missing braces are fixed by force=true
     - '[ITEM] IRON_INGOT 1 "display":{"Name":"{\"text\":\"Force-fixed Iron Ingot\"}"} force=true'
     # 6. ✅ Empty NBT: gives a normal dirt

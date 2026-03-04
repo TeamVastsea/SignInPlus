@@ -8,9 +8,9 @@ import java.sql.SQLException
 
 
 object DatabaseHelper {
-    var database: Database
+    lateinit var database: Database
 
-    init {
+    fun init() {
         val cfg = SignInPlus.instance.config
         val typeRaw = cfg.getString("database.type")?.lowercase() ?: "sqlite"
         val rawUrl = cfg.getString("database.url") ?: ""
@@ -38,15 +38,17 @@ object DatabaseHelper {
 
     private fun ensureSqlite(rawUrl: String): String {
         val dbFileName = if (rawUrl.isBlank() || rawUrl.contains(":")) "signinplus.db" else rawUrl
-        val dir = File("plugins/SignInPlus")
-        if (!dir.exists()) dir.mkdirs()
-        val sqlitePath = "plugins/SignInPlus/$dbFileName"
-        val f = File(sqlitePath)
-        if (!f.exists()) {
-            try { f.createNewFile() } catch (_: Throwable) {}
-            SignInPlus.instance.logger.info("SQLite database initialized: $sqlitePath")
+        val folder = SignInPlus.instance.dataFolder
+        if (!folder.exists()) folder.mkdirs()
+        
+        val file = File(folder, dbFileName)
+        if (!file.exists()) {
+            try { file.createNewFile() } catch (e: Throwable) {
+                SignInPlus.instance.logger.warning("Failed to create SQLite file: ${e.message}")
+            }
+            SignInPlus.instance.logger.info("SQLite database initialized: ${file.path}")
         }
-        return "jdbc:sqlite:$sqlitePath"
+        return "jdbc:sqlite:${file.path}"
     }
 
     private fun parseParts(rawUrl: String, defaultPort: String): Triple<String, String, String> {
