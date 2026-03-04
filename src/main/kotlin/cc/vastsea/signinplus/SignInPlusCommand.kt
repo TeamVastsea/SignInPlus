@@ -58,17 +58,24 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                     return true
                 }
-                if (args.size != 2) {
-                    // zh_CN only provides a generic usage key: commands.usage expects {usage}
+                
+                val targetName = if (args.size == 2) args[1] else sender.name
+                
+                // 如果是控制台执行且没有指定玩家
+                if (args.size < 2 && sender !is Player) {
                     sender.sendMessage("$prefix${loc("commands.usage", mapOf("usage" to "/$label force_check_in <player>"))}")
                     return true
                 }
-                val target = args[1]
-                val player = plugin.server.getPlayerExact(target) ?: return false
+
+                val player = plugin.server.getPlayerExact(targetName) ?: run {
+                    sender.sendMessage("$prefix§cPlayer not found: $targetName")
+                    return true
+                }
+                
                 Checkins.signInToday(player.uniqueId)
                 plugin.rewardExecutor.onSignedIn(player.uniqueId)
                 // zh_CN uses force_sign_in_success with placeholder {target}
-                sender.sendMessage("$prefix§a${loc("commands.force_sign_in_success", mapOf("target" to target))}")
+                sender.sendMessage("$prefix§a${loc("commands.force_sign_in_success", mapOf("target" to targetName))}")
             }
 
             "status" -> {
