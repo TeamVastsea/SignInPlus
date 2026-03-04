@@ -29,7 +29,7 @@ class SignInPlus : JavaPlugin() {
         val tz = config.getString("timezone") ?: "Asia/Shanghai"
         zoneId = ZoneId.of(tz)
         
-        // 初始化/重载数据库连接
+        // 初始化数据库连接
         DatabaseHelper.init()
         transaction(DatabaseHelper.database) { create(Checkins, ClaimedRewards, CorrectionSlips, PluginMeta, Points, SpecialDateClaims) }
         PluginMeta.initFirstLaunchDay()
@@ -68,9 +68,8 @@ class SignInPlus : JavaPlugin() {
     }
 
     fun reloadAll() {
-        // 重载配置
+        // 重载前先确保资源文件存在（应对用户误删的情况）
         ensureResources()
-        
         reloadConfig()
         // 重新加载本地化（以便管理员修改 data-folder 下的 lang 文件或更改 config.locale）
         val newLocale = config.getString("locale") ?: localization.locale
@@ -80,7 +79,7 @@ class SignInPlus : JavaPlugin() {
         DatabaseHelper.init()
         // 确保表结构存在
         transaction(DatabaseHelper.database) { create(Checkins, ClaimedRewards, CorrectionSlips, PluginMeta, Points, SpecialDateClaims) }
-        
+
         // 重新创建奖励执行器，应用最新配置（如消息前缀、奖励表）
         rewardExecutor = cc.vastsea.signinplus.rewards.RewardExecutor(this)
 
