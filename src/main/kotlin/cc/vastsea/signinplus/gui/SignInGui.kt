@@ -112,7 +112,11 @@ object SignInGui {
 
             val guiItem = item.asGuiItem { _ ->
                     if (isToday && !isSigned) {
-                        player.performCommand("signinplus")
+                        // 直接调用签到逻辑，不通过 performCommand
+                        Checkins.signInToday(player.uniqueId)
+                        SignInPlus.instance.rewardExecutor.onSignedIn(player.uniqueId)
+                        player.sendMessage(SignInPlus.localization.get("commands.sign_in_success"))
+                        
                         // Refresh GUI after action
                         SignInPlus.instance.server.scheduler.runTask(SignInPlus.instance, Runnable {
                             open(player, yearMonth)
