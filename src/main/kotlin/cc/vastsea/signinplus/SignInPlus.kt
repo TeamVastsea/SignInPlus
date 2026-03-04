@@ -79,6 +79,7 @@ class SignInPlus : JavaPlugin() {
         DatabaseHelper.init()
         // 确保表结构存在
         transaction(DatabaseHelper.database) { create(Checkins, ClaimedRewards, CorrectionSlips, PluginMeta, Points, SpecialDateClaims) }
+        PluginMeta.initFirstLaunchDay()
 
         // 重新创建奖励执行器，应用最新配置（如消息前缀、奖励表）
         rewardExecutor = cc.vastsea.signinplus.rewards.RewardExecutor(this)
