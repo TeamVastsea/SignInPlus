@@ -17,6 +17,7 @@
 - `[ITEM]` 奖励改用现代 `/give` 数据组件解析，移除已弃用的 Paper Unsafe NBT 接口。
 - Web API 增加 Bearer API Key、限流、请求参数约束与有界工作线程，并默认仅监听本机回环地址。
 - 加入 SQLite/PostgreSQL 并发与完整性测试；目标运行版本更新为 Paper 1.21.11。
+- Release 改为 Lite JAR，运行库在服务器首次启动时自动下载并缓存，不再发布 27.6 MB 的依赖合集。
 
 > 1.7.0 使用全新 UUID 数据结构，不提供旧数据库迁移。部署前请创建空数据库。
 
@@ -92,19 +93,26 @@
 - 数据库账号或密码可通过 `SIGNINPLUS_DB_USERNAME`、`SIGNINPLUS_DB_PASSWORD` 环境变量注入。
 
 **构建与测试**
-- 推荐构建方式：`./gradlew build` 或 `./gradlew shadowJar`（产物位于 `build/libs`）
+- 推荐构建方式：`./gradlew build`（产物位于 `build/libs`）
 - 本地运行：`./gradlew runServer`，启动 Paper 1.21.11 测试服务器
-- Release 仅提供一个自包含 JAR；Kotlin、数据库驱动与运行时依赖均已打包，无需另行下载 Lite/Full 两种包。
+- Release 仅提供一个 Lite JAR，不内嵌 Kotlin、GUI、JSON、数据库驱动及连接池。
+- `build` 会校验 JAR 小于 1 MB 且不含运行库包，防止误发 Full JAR。
+
+**运行依赖下载**
+- 依赖声明位于 `plugin.yml` 的 `libraries`，由 Paper/Spigot 在插件加载前从 Maven Central 自动下载并加入插件 ClassPath。
+- 第一次启动必须允许服务器访问 Maven 仓库；下载完成后依赖会缓存在服务端 `libraries` 目录，后续启动无需重复下载。
+- 自动下载内容包括 Kotlin、Triumph GUI、Gson、Exposed、SQLite/PostgreSQL/MySQL 驱动及 HikariCP；其传递依赖也会一并解析。
+- Paper 可通过 `PAPER_DEFAULT_CENTRAL_REPOSITORY` 配置 Maven Central 镜像，详见 [Paper plugin.yml libraries 文档](https://docs.papermc.io/paper/dev/plugin-yml/#libraries)。
 
 **技术栈**
 - Kotlin：2.2.20
 - 目标 JVM：21
-- Gradle 插件：Shadow 9.2.2, xyz.jpenilla.run-paper 3.0.2
+- Gradle 插件：xyz.jpenilla.run-paper 3.0.2
 
 **兼容性**
 - 服务器：Paper/Spigot `1.20+`（测试版本：Paper 1.21.11）
 - Java：服务器运行环境 `Java 21+`
-- 依赖：PlaceholderAPI 2.11.5（可选）；Kotlin 运行时已打包进插件
+- 依赖：PlaceholderAPI 2.11.5（可选）；其余运行库由服务器在首次启动时自动下载
 - UniversalAuth：无需在后端安装其 Velocity API。UniversalAuth 认证完成后下发的永久 `profileUuid` 会成为 Paper 的 `Player.uniqueId`，SignInPlus 直接以此 UUID 作为数据库主键。
 - 使用 UniversalAuth 时必须正确启用 Velocity modern forwarding、保护 forwarding secret，并阻止公网绕过代理直连后端；确认后在 SignInPlus 设置 `identity.require_stable_uuid: true`。
 

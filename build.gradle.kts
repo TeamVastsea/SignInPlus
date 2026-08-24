@@ -1,8 +1,8 @@
-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import org.gradle.api.tasks.bundling.Jar
+import java.util.zip.ZipFile
 
 plugins {
     kotlin("jvm") version "2.2.20"
-    id("com.gradleup.shadow") version "9.2.2"
     id("xyz.jpenilla.run-paper") version "3.0.2"
 }
 
@@ -54,6 +54,36 @@ kotlin {
     jvmToolchain(21)
 }
 
+val liteJar = tasks.named<Jar>("jar")
+
+val verifyLiteJar by tasks.registering {
+    dependsOn(liteJar)
+    doLast {
+        val artifact = liteJar.get().archiveFile.get().asFile
+        val forbiddenPrefixes = listOf(
+            "kotlin/",
+            "org/jetbrains/exposed/",
+            "org/sqlite/",
+            "org/postgresql/",
+            "com/mysql/",
+            "com/zaxxer/hikari/",
+            "dev/triumphteam/",
+            "com/google/gson/",
+        )
+        ZipFile(artifact).use { archive ->
+            val embeddedLibrary = archive.entries().asSequence()
+                .map { it.name }
+                .firstOrNull { entry -> forbiddenPrefixes.any(entry::startsWith) }
+            check(embeddedLibrary == null) {
+                "Lite JAR contains an embedded runtime library: $embeddedLibrary"
+            }
+        }
+        check(artifact.length() < 1_000_000L) {
+            "Lite JAR unexpectedly exceeds 1 MB: ${artifact.length()} bytes"
+        }
+    }
+}
+
 tasks {
     processResources {
         inputs.property("pluginVersion", pluginVersion)
@@ -62,21 +92,15 @@ tasks {
         }
     }
 
-    shadowJar {
-        archiveClassifier.set(null as String?)
-        relocate("dev.triumphteam.gui", "cc.vastsea.signinplus.lib.gui")
-        relocate("com.google.gson", "cc.vastsea.signinplus.lib.gson")
-
-        exclude("META-INF/*.SF")
-        exclude("META-INF/*.DSA")
-        exclude("META-INF/*.RSA")
-    }
-
     runServer {
         minecraftVersion("1.21.11")
     }
 
     test {
         useJUnitPlatform()
+    }
+
+    check {
+        dependsOn(verifyLiteJar)
     }
 }
