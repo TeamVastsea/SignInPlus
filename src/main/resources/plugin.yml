@@ -1,15 +1,12 @@
 name: SignInPlus
 main: cc.vastsea.signinplus.SignInPlus
 version: ${version}
-api: spigot
 api-version: '1.20'
 authors:
   - Snowball_233
   - zrll_
 description: >
   A modern, full-featured check-in system for Spigot servers: daily sign-ins, streak and total tracking, make-up cards, top rankings, points economy, PlaceholderAPI placeholders, optional Web API, and rich configurable rewards.
-depend:
-  - Kotlin
 softdepend:
   - PlaceholderAPI
 commands:
@@ -27,11 +24,3 @@ permissions:
   signinplus.admin:
     description: Administer the sign-in system (force check-in, make-up for others, reload)
     default: op
-libraries:
-  - org.xerial:sqlite-jdbc:3.46.0.0
-  - org.jetbrains.exposed:exposed-core:0.58.0
-  - org.jetbrains.exposed:exposed-jdbc:0.58.0
-  - org.jetbrains.exposed:exposed-java-time:0.58.0
-  - org.postgresql:postgresql:42.7.5
-  - com.mysql:mysql-connector-j:9.2.0
-  - com.zaxxer:HikariCP:6.2.1

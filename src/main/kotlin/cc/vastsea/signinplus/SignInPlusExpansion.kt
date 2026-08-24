@@ -3,16 +3,21 @@ package cc.vastsea.signinplus
 import cc.vastsea.signinplus.storage.CorrectionSlips
 import cc.vastsea.signinplus.storage.Points
 import cc.vastsea.signinplus.storage.Checkins
+import cc.vastsea.signinplus.storage.PlayerProfiles
 import me.clip.placeholderapi.expansion.PlaceholderExpansion
-import org.bukkit.Bukkit
 import org.bukkit.OfflinePlayer
 import org.bukkit.plugin.java.JavaPlugin
 import java.util.UUID
+import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 class SignInPlusExpansion(private val plugin: JavaPlugin) : PlaceholderExpansion() {
+    private val cache = ConcurrentHashMap<String, CacheEntry>()
+
     override fun getIdentifier(): String = "signinplus"
     override fun getAuthor(): String = plugin.description.authors.joinToString(", ")
     override fun getVersion(): String = plugin.description.version
+    override fun persist(): Boolean = true
 
     override fun onRequest(player: OfflinePlayer?, params: String): String? {
         // 统一支持离线玩家：允许通过后缀玩家名查询；若未提供后缀，则使用请求者
@@ -26,25 +31,28 @@ class SignInPlusExpansion(private val plugin: JavaPlugin) : PlaceholderExpansion
         }
 
         fun resolveUuid(targetName: String?, context: OfflinePlayer?): UUID? {
-            // 优先使用上下文玩家（无后缀时）
-            if (targetName == null) return context?.uniqueId
+            // 无后缀或目标就是上下文玩家时，直接使用后端收到的稳定 UUID。
+            if (targetName == null || context?.name?.equals(targetName, ignoreCase = true) == true) {
+                return context?.uniqueId
+            }
             // 在线玩家精确匹配
             plugin.server.getPlayerExact(targetName)?.uniqueId?.let { return it }
-            // 仅使用服务端已缓存的离线玩家，避免远程查询导致 NPE
-            plugin.server.offlinePlayers.firstOrNull { it.name?.equals(targetName, true) == true }?.uniqueId?.let { return it }
-            // 离线模式下可计算离线 UUID；在线模式未知玩家返回 null
-            return if (!plugin.server.onlineMode) UUID.nameUUIDFromBytes(("OfflinePlayer:" + targetName).toByteArray(Charsets.UTF_8)) else null
+            // 离线查询只使用已由真实登录写入的 UUID→名字映射，绝不按名字计算 UUID。
+            return PlayerProfiles.resolveUuid(targetName)
         }
 
         // 今日总签到人数（无玩家上下文）
         if (lower == "amount_today") {
-            return Checkins.getAmountToday().toString()
+            return cached("amount_today") { Checkins.getAmountToday().toString() }
         }
 
         // 今日签到状态（仅保留新键）
         matchWithOptionalName("status")?.let { targetName ->
             val uuid = resolveUuid(targetName, player) ?: return SignInPlus.localization.get("commands.status.unknown")
-            return if (Checkins.isSignedIn(uuid)) "§a" + SignInPlus.localization.get("commands.status.signed_in") else "§c" + SignInPlus.localization.get("commands.status.not_signed_in")
+            return cached("status:$uuid") {
+                if (Checkins.isSignedIn(uuid)) "§a" + SignInPlus.localization.get("commands.status.signed_in")
+                else "§c" + SignInPlus.localization.get("commands.status.not_signed_in")
+            }
         }
 
         // 玩家相关键（不再支持旧前缀）：total_days, streak_days, last_check_in_time, rank_today, points
@@ -59,23 +67,34 @@ class SignInPlusExpansion(private val plugin: JavaPlugin) : PlaceholderExpansion
                     "points" -> return "0.00"
                     else -> return null
                 }
-                return when (key) {
+                return cached("$key:$uuid") { when (key) {
                     "total_days" -> Checkins.getTotalDays(uuid).toString()
                     "streak_days" -> Checkins.getStreakDays(uuid).toString()
                     "last_check_in_time" -> Checkins.getLastCheckInTime(uuid)
                     "rank_today" -> Checkins.getRankToday(uuid)
-                    "points" -> String.format("%.2f", Points.getPoints(uuid) / 100.0)
+                    "points" -> String.format(Locale.ROOT, "%.2f", Points.getPoints(uuid) / 100.0)
                     else -> null
-                }
+                } ?: "" }
             }
         }
 
         // 补签卡数量（仅保留新键 corr）
         matchWithOptionalName("corr")?.let { targetName ->
             val uuid = resolveUuid(targetName, player) ?: return "0"
-            return CorrectionSlips.getCorrectionSlipAmount(uuid).toString()
+            return cached("corr:$uuid") { CorrectionSlips.getCorrectionSlipAmount(uuid).toString() }
         }
 
         return null
     }
+
+    private fun cached(key: String, loader: () -> String): String {
+        val now = System.nanoTime()
+        cache[key]?.takeIf { it.expiresAt > now }?.let { return it.value }
+        val value = loader()
+        cache[key] = CacheEntry(now + 1_000_000_000L, value)
+        if (cache.size > 10_000) cache.entries.removeIf { it.value.expiresAt <= now }
+        return value
+    }
+
+    private data class CacheEntry(val expiresAt: Long, val value: String)
 }

@@ -7,6 +7,9 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.javatime.date
 import org.jetbrains.exposed.sql.javatime.time
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.nio.ByteBuffer
+import java.sql.Connection
+import java.sql.ResultSet
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.*
@@ -15,141 +18,148 @@ import kotlin.use
 
 /*
 CREATE TABLE IF NOT EXISTS checkins (
-    player TEXT NOT NULL,
+    player_uuid UUID NOT NULL,
     day TEXT NOT NULL,
     time INTEGER NOT NULL
 );
 */
 object Checkins : Table() {
-    val player = uuid("player").index()
+    val player = uuid("player_uuid").index()
     val day = date("day").index()
     val time = time("time")
 
+    override val primaryKey = PrimaryKey(player, day, name = "pk_checkins")
+
     init {
-        index(false, player, day)
         index(false, day, time)
     }
 
     fun isSignedIn(player: UUID): Boolean {
         val day = today()
-        return transaction {
+        return transaction(DatabaseHelper.database) {
             Checkins.selectAll().where { Checkins.player.eq(player).and { Checkins.day.eq(day) } }.count() > 0
         }
     }
 
-    fun signInToday(player: UUID) {
+    fun signInToday(player: UUID): Boolean {
         val day = today()
-        transaction {
-            if (isSignedIn(player)) {
-                return@transaction
-            }
-            Checkins.insert {
+        return transaction(DatabaseHelper.database) {
+            Checkins.insertIgnore {
                 it[Checkins.player] = player
                 it[Checkins.day] = day
                 it[Checkins.time] = now()
-            }
+            }.insertedCount > 0
         }
     }
 
     fun makeUpSign(player: UUID, cards: Int, force: Boolean): Pair<List<LocalDate>, Int> {
-        val today = today()
-        val isSignedInToday = isSignedIn(player)
-        val missedDaysCount = getMissedDays(player)
+        val currentDay = today()
+        val requestedCards = cards.coerceAtLeast(0)
+        return transaction(DatabaseHelper.database) {
+            val signedDays = Checkins.selectAll().where { Checkins.player eq player }
+                .map { it[Checkins.day] }
+                .toMutableSet()
+            val firstLaunchDate = PluginMeta.selectAll()
+                .where { PluginMeta.key eq "first_launch_day" }
+                .firstOrNull()?.get(PluginMeta.value)?.let(LocalDate::parse)
+                ?: currentDay
+            val firstEligibleDate = signedDays.minOrNull()?.let { maxOf(it, firstLaunchDate) } ?: currentDay
 
-        if (!isSignedInToday && missedDaysCount == 0) {
-            signInToday(player)
-            return Pair(listOf(today), cards)
-        }
-
-        val firstLaunchDate = PluginMeta.getFirstLaunchDate() ?: return Pair(emptyList(), cards)
-
-        val signedDays = getSignedDates(player).map { it.toString() }.toSet()
-
-        val missedDays = mutableListOf<LocalDate>()
-        var currentDate = today.minusDays(1)
-        while (!currentDate.isBefore(firstLaunchDate)) {
-            if (!signedDays.contains(currentDate.toString())) {
-                missedDays.add(currentDate)
+            val missedDays = mutableListOf<LocalDate>()
+            var currentDate = currentDay.minusDays(1)
+            while (!currentDate.isBefore(firstEligibleDate)) {
+                if (currentDate !in signedDays) missedDays += currentDate
+                currentDate = currentDate.minusDays(1)
             }
-            currentDate = currentDate.minusDays(1)
-        }
 
-        if (missedDays.isEmpty()) {
-            if (!isSignedInToday) {
-                signInToday(player)
-                return Pair(listOf(today), cards)
+            val availableSlips = if (force) Int.MAX_VALUE else CorrectionSlips.getAmountForUpdate(player)
+            val insertionLimit = minOf(requestedCards, missedDays.size, availableSlips)
+            val daysToSign = mutableListOf<LocalDate>()
+            for (dayToSign in missedDays) {
+                if (daysToSign.size >= insertionLimit) break
+                val inserted = Checkins.insertIgnore {
+                    it[Checkins.player] = player
+                    it[Checkins.day] = dayToSign
+                    it[Checkins.time] = now()
+                }.insertedCount > 0
+                if (inserted) daysToSign += dayToSign
             }
-            return Pair(emptyList(), cards) // No days to make up, return all cards
-        }
-
-        val slipsToUse =
-            if (force) cards.coerceAtMost(missedDays.size) else CorrectionSlips.getCorrectionSlipAmount(player)
-                .coerceAtMost(cards)
-                .coerceAtMost(missedDays.size)
-        if (!force) {
-            CorrectionSlips.decreaseCorrectionSlip(player, slipsToUse)
-        }
-        val daysToSign = missedDays.take(slipsToUse)
-
-        transaction {
-            Checkins.batchInsert(daysToSign) { dayToSign ->
-                this[Checkins.player] = player
-                this[Checkins.day] = dayToSign
-                this[Checkins.time] = now()
+            if (!force && daysToSign.isNotEmpty()) {
+                CorrectionSlips.setAmountInTransaction(player, availableSlips - daysToSign.size)
             }
+
+            val madeUpDays = daysToSign.toMutableList()
+            if (currentDay !in signedDays) {
+                val inserted = Checkins.insertIgnore {
+                    it[Checkins.player] = player
+                    it[Checkins.day] = currentDay
+                    it[Checkins.time] = now()
+                }.insertedCount > 0
+                if (inserted) madeUpDays += currentDay
+            }
+
+            Pair(madeUpDays, requestedCards - daysToSign.size)
         }
-
-        val refundedCards = cards - slipsToUse
-
-        val madeUpDays = daysToSign.toMutableList()
-        if (!isSignedInToday) {
-            signInToday(player)
-            madeUpDays.add(today)
-        }
-
-        return Pair(madeUpDays, refundedCards)
     }
 
-    fun forceSignDate(player: UUID, date: LocalDate) {
-        transaction {
-            if (Checkins.selectAll().where { Checkins.player.eq(player).and { Checkins.day.eq(date) } }.count() > 0) {
-                return@transaction
-            }
-            Checkins.insert {
+    fun forceSignDate(player: UUID, date: LocalDate): Boolean {
+        return transaction(DatabaseHelper.database) {
+            Checkins.insertIgnore {
                 it[Checkins.player] = player
                 it[Checkins.day] = date
                 it[Checkins.time] = java.time.LocalTime.MIN
-            }
+            }.insertedCount > 0
+        }
+    }
+
+    fun makeUpDate(player: UUID, date: LocalDate): Boolean {
+        val currentDay = today()
+        if (!date.isBefore(currentDay)) return false
+        return transaction(DatabaseHelper.database) {
+            val signedDays = Checkins.selectAll().where { Checkins.player eq player }
+                .map { it[Checkins.day] }
+                .toSet()
+            if (date in signedDays) return@transaction false
+            val firstLaunchDate = PluginMeta.selectAll()
+                .where { PluginMeta.key eq "first_launch_day" }
+                .firstOrNull()?.get(PluginMeta.value)?.let(LocalDate::parse)
+                ?: return@transaction false
+            val firstEligibleDate = signedDays.minOrNull()?.let { maxOf(it, firstLaunchDate) }
+                ?: return@transaction false
+            if (date.isBefore(firstEligibleDate)) return@transaction false
+
+            val available = CorrectionSlips.getAmountForUpdate(player)
+            if (available <= 0) return@transaction false
+            val inserted = Checkins.insertIgnore {
+                it[Checkins.player] = player
+                it[Checkins.day] = date
+                it[Checkins.time] = java.time.LocalTime.MIN
+            }.insertedCount > 0
+            if (!inserted) return@transaction false
+            CorrectionSlips.setAmountInTransaction(player, available - 1)
+            true
         }
     }
 
     fun getTotalDays(player: UUID): Int {
-        return transaction {
-            Checkins.selectAll().where { Checkins.player eq player }
-                .withDistinct()
-                .count()
-                .toInt()
+        return transaction(DatabaseHelper.database) {
+            Checkins.select(Checkins.day.countDistinct()).where { Checkins.player eq player }
+                .first()[Checkins.day.countDistinct()].toInt()
         }
     }
 
     fun getStreakDays(player: UUID): Int {
         // 计算以“玩家最近一次签到日”为基准的连续天数（兼容补签不含今日）
-        val days = transaction {
+        val days = transaction(DatabaseHelper.database) {
             Checkins.selectAll().where { Checkins.player eq player }
-                .withDistinct()
-                .map { it[Checkins.day].toString() }
+                .orderBy(Checkins.day, SortOrder.DESC)
+                .map { it[Checkins.day] }
                 .toSet()
         }
         if (days.isEmpty()) return 0
-        var latestDay = transaction {
-            Checkins.selectAll().where { Checkins.player eq player }
-                .orderBy(Checkins.day, SortOrder.DESC)
-                .limit(1)
-                .firstOrNull()
-                ?.get(Checkins.day)
-        } ?: return 0
+        var latestDay = days.maxOrNull() ?: return 0
         var streak = 0
-        while (days.contains(latestDay.toString())) {
+        while (days.contains(latestDay)) {
             streak += 1
             latestDay = latestDay.minusDays(1)
         }
@@ -158,18 +168,22 @@ object Checkins : Table() {
 
 
     fun getLastCheckInTime(player: UUID): String {
-        return transaction {
-            val time = Checkins.selectAll().where { Checkins.player eq player }
+        return transaction(DatabaseHelper.database) {
+            val row = Checkins.selectAll().where { Checkins.player eq player }
+                .orderBy(Checkins.day, SortOrder.DESC)
                 .orderBy(Checkins.time, SortOrder.DESC)
                 .limit(1)
                 .firstOrNull()
-                ?.get(Checkins.time)
-            time?.toString() ?: SignInPlus.localization.get("commands.status.not_signed_in")
+            if (row == null) return@transaction SignInPlus.localization.get("commands.status.not_signed_in")
+            LocalDateTime.of(row[Checkins.day], row[Checkins.time])
+                .atZone(SignInPlus.zoneId)
+                .toOffsetDateTime()
+                .toString()
         }
     }
 
     fun getRankToday(player: UUID): String {
-        return transaction {
+        return transaction(DatabaseHelper.database) {
             val day = today()
             val checkinsToday = Checkins.selectAll().where { Checkins.day eq day }
                 .orderBy(Checkins.time, SortOrder.ASC)
@@ -185,7 +199,7 @@ object Checkins : Table() {
     }
 
     fun getAmountToday(): Int {
-        return transaction {
+        return transaction(DatabaseHelper.database) {
             val day = today()
             Checkins.selectAll().where { Checkins.day eq day }
                 .withDistinct()
@@ -195,7 +209,7 @@ object Checkins : Table() {
     }
 
     fun topTotal(limit: Int): List<Pair<UUID, Int>> {
-        return transaction {
+        return transaction(DatabaseHelper.database) {
             val dayCount = Checkins.day.countDistinct()
             Checkins.select(player, dayCount)
                 .groupBy(Checkins.player)
@@ -206,26 +220,80 @@ object Checkins : Table() {
     }
 
     fun topStreak(limit: Int): List<Pair<UUID, Int>> {
-        // 简化：计算每玩家 streak，再排序（效率一般，但足够）
-        val players = transaction {
-            Checkins.select(player).withDistinct().map { it[Checkins.player] }
+        val safeLimit = limit.coerceIn(1, 1_000)
+        return transaction(DatabaseHelper.database) {
+            val jdbc = connection.connection as Connection
+            val product = jdbc.metaData.databaseProductName.lowercase(Locale.ROOT)
+            val q = jdbc.metaData.identifierQuoteString.trim().ifBlank { "\"" }
+            fun ident(value: String) = q + value.replace(q, q + q) + q
+            val table = ident(Checkins.tableName.lowercase(Locale.ROOT))
+            val playerColumn = ident("player_uuid")
+            val dayColumn = ident("day")
+            val groupExpression = when {
+                "postgresql" in product ->
+                    "$dayColumn - CAST(ROW_NUMBER() OVER (PARTITION BY $playerColumn ORDER BY $dayColumn) AS INTEGER)"
+                "mysql" in product ->
+                    "TO_DAYS($dayColumn) - ROW_NUMBER() OVER (PARTITION BY $playerColumn ORDER BY $dayColumn)"
+                "sqlite" in product ->
+                    "CAST(julianday($dayColumn) AS INTEGER) - ROW_NUMBER() OVER " +
+                        "(PARTITION BY $playerColumn ORDER BY $dayColumn)"
+                else -> error("Unsupported database for streak ranking: ${jdbc.metaData.databaseProductName}")
+            }
+            val sql = """
+                WITH ordered_days AS (
+                    SELECT $playerColumn AS player_uuid, $dayColumn AS sign_day,
+                           $groupExpression AS streak_group
+                    FROM $table
+                ), streak_runs AS (
+                    SELECT player_uuid, COUNT(*) AS streak, MAX(sign_day) AS end_day
+                    FROM ordered_days
+                    GROUP BY player_uuid, streak_group
+                ), latest_days AS (
+                    SELECT $playerColumn AS player_uuid, MAX($dayColumn) AS latest_day
+                    FROM $table
+                    GROUP BY $playerColumn
+                )
+                SELECT runs.player_uuid, runs.streak
+                FROM streak_runs runs
+                JOIN latest_days latest
+                  ON latest.player_uuid = runs.player_uuid
+                 AND latest.latest_day = runs.end_day
+                ORDER BY runs.streak DESC, runs.player_uuid
+                LIMIT ?
+            """.trimIndent()
+
+            jdbc.prepareStatement(sql).use { statement ->
+                statement.setInt(1, safeLimit)
+                statement.executeQuery().use { rows ->
+                    buildList {
+                        while (rows.next()) {
+                            add(rows.uuid("player_uuid") to rows.getInt("streak"))
+                        }
+                    }
+                }
+            }
         }
-        val ranked = players.map { it to getStreakDays(it) }.sortedByDescending { it.second }.take(limit)
-        return ranked
+    }
+
+    private fun ResultSet.uuid(column: String): UUID = when (val raw = getObject(column)) {
+        is UUID -> raw
+        is ByteArray -> ByteBuffer.wrap(raw).let { UUID(it.long, it.long) }
+        else -> UUID.fromString(raw.toString())
     }
 
     fun getSignedDates(player: UUID): List<LocalDate> {
-        return transaction {
+        return transaction(DatabaseHelper.database) {
             Checkins.selectAll().where { Checkins.player eq player }
                 .orderBy(Checkins.day, SortOrder.ASC)
                 .map { it[Checkins.day] }
+                .distinct()
         }
     }
 
     fun getMissedDays(player: UUID): Int {
-        val firstDay = PluginMeta.getFirstLaunchDate() ?: return 0
         val signedDates = getSignedDates(player).toSet()
-        if (firstDay !in signedDates) return 0 // Not even signed once
+        val firstSignedDay = signedDates.minOrNull() ?: return 0
+        val firstDay = maxOf(PluginMeta.getFirstLaunchDate() ?: firstSignedDay, firstSignedDay)
 
         var missed = 0
         var currentDate = firstDay

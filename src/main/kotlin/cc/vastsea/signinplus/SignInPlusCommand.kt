@@ -22,7 +22,12 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
 
     private fun onlinePlayerNames(): List<String> = plugin.server.onlinePlayers.map { it.name }
     private fun suggestNumbers(): List<String> = listOf("1", "2", "3", "5", "10")
-    private fun formatPointsDisplay(raw: Double): String = String.format("%.2f", raw / 100.0)
+    private fun formatPointsDisplay(raw: Long): String = String.format(Locale.ROOT, "%.2f", raw / 100.0)
+    private fun pointsToCents(amount: Double): Long? {
+        val scaled = amount * 100.0
+        if (!scaled.isFinite() || scaled !in 0.0..Long.MAX_VALUE.toDouble()) return null
+        return kotlin.math.round(scaled).toLong()
+    }
 
     private fun checkPermission(sender: CommandSender, permission: String, allowAdmin: Boolean = true): Boolean {
         if (sender.hasPermission(permission)) return true
@@ -42,9 +47,12 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                 if (Checkins.isSignedIn(sender.uniqueId)) {
                     sender.sendMessage("$prefix§e${loc("commands.already_signed_in")}")
                 } else {
-                    Checkins.signInToday(sender.uniqueId)
-                    plugin.rewardExecutor.onSignedIn(sender.uniqueId)
-                    sender.sendMessage("$prefix§a${loc("commands.sign_in_success")}")
+                    if (Checkins.signInToday(sender.uniqueId)) {
+                        plugin.rewardExecutor.onSignedIn(sender.uniqueId)
+                        sender.sendMessage("$prefix§a${loc("commands.sign_in_success")}")
+                    } else {
+                        sender.sendMessage("$prefix§e${loc("commands.already_signed_in")}")
+                    }
                 }
                 return true
             }
@@ -72,7 +80,10 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     return true
                 }
                 
-                Checkins.signInToday(player.uniqueId)
+                if (!Checkins.signInToday(player.uniqueId)) {
+                    sender.sendMessage("$prefix§e${loc("commands.already_signed_in")}")
+                    return true
+                }
                 plugin.rewardExecutor.onSignedIn(player.uniqueId)
                 // zh_CN uses force_sign_in_success with placeholder {target}
                 sender.sendMessage("$prefix§a${loc("commands.force_sign_in_success", mapOf("target" to targetName))}")
@@ -96,11 +107,11 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     }
                 }
                 val player = plugin.server.getPlayerExact(targetName) ?: return false
-                val stat = PlayerStat(player.uniqueId)
-                val signedToday = Checkins.isSignedIn(player.uniqueId)
-                val totalDays = Checkins.getTotalDays(player.uniqueId)
-                val streakDays = Checkins.getStreakDays(player.uniqueId)
-                val missedDays = Checkins.getMissedDays(player.uniqueId)
+                val stat = PlayerStat.load(player.uniqueId)
+                val signedToday = stat.signedToday
+                val totalDays = stat.totalDays
+                val streakDays = stat.streakDays
+                val missedDays = stat.missedDays
                 val correctionSlips = stat.correctionSlipAmount
                 val usableSlips = missedDays.coerceAtMost(correctionSlips)
                 //    stats_of: "§b玩家 {targetName} 的签到状态"
@@ -186,8 +197,11 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                     return true
                 }
-                plugin.reloadAll()
-                sender.sendMessage("$prefix§a${loc("commands.config_reloaded")}")
+                if (plugin.reloadAll()) {
+                    sender.sendMessage("$prefix§a${loc("commands.config_reloaded")}")
+                } else {
+                    sender.sendMessage("$prefix§c${loc("commands.config_reload_failed")}")
+                }
             }
 
             "points" -> {
@@ -225,18 +239,21 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                             val amount = args[3].toDoubleOrNull()
                             val player = plugin.server.getPlayerExact(target) ?: return false
 
-                            if (amount == null) {
+                            if (amount == null || !amount.isFinite()) {
                                 // zh_CN uses points_must_be_number
                                 sender.sendMessage("$prefix§c${loc("commands.points_must_be_number")}")
                             } else {
-                                val cents = kotlin.math.round(amount * 100.0).toDouble()
+                                val cents = pointsToCents(amount) ?: run {
+                                    sender.sendMessage("$prefix§c${loc("commands.points_must_be_number")}")
+                                    return true
+                                }
                                 Points.setPoints(player.uniqueId, cents)
                                 sender.sendMessage(
                                     "$prefix§a${
                                         loc(
                                             // zh_CN: set_points_success expects {target} and {points}
                                             "commands.set_points_success",
-                                            mapOf("target" to target, "points" to String.format("%.2f", amount))
+                                            mapOf("target" to target, "points" to String.format(Locale.ROOT, "%.2f", amount))
                                         )
                                     }"
                                 )
@@ -252,7 +269,7 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                         if (args.size >= 3) {
                             val target = args[2]
                             val player = plugin.server.getPlayerExact(target) ?: return false
-                            Points.setPoints(player.uniqueId, 0.0)
+                            Points.setPoints(player.uniqueId, 0L)
                             // zh_CN: clear_points_success expects {target}
                             sender.sendMessage("$prefix§a${loc("commands.clear_points_success", mapOf("target" to target))}")
                         } else sender.sendMessage("$prefix${loc("commands.usage", mapOf("usage" to "/$label points clear <player>"))}")
@@ -266,14 +283,19 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                         if (args.size >= 4) {
                             val target = args[2]
                             val amount = args[3].toDoubleOrNull()
-                                if (amount == null) {
+                            if (amount == null || !amount.isFinite()) {
                                 sender.sendMessage("$prefix§c${loc("commands.points_must_be_number")}")
+                            } else if (amount < 0.0) {
+                                sender.sendMessage("$prefix§c${loc("commands.amount_must_be_positive")}")
                             } else {
-                                val cents = -kotlin.math.round(amount * 100.0)
+                                val cents = pointsToCents(amount) ?: run {
+                                    sender.sendMessage("$prefix§c${loc("commands.points_must_be_number")}")
+                                    return true
+                                }
                                 val player = plugin.server.getPlayerExact(target) ?: return false
-                                Points.addPoints(player.uniqueId, cents)
+                                Points.addPoints(player.uniqueId, -cents)
                                 // zh_CN: decrease_points_success expects {points} and {target}
-                                sender.sendMessage("$prefix§a${loc("commands.decrease_points_success", mapOf("target" to target, "points" to String.format("%.2f", amount)))}")
+                                sender.sendMessage("$prefix§a${loc("commands.decrease_points_success", mapOf("target" to target, "points" to String.format(Locale.ROOT, "%.2f", amount)))}")
                             }
                         } else sender.sendMessage("$prefix${loc("commands.usage", mapOf("usage" to "/$label points decrease <player> <amount>"))}")
                     }
@@ -286,14 +308,19 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                         if (args.size >= 4) {
                             val target = args[2]
                             val amount = args[3].toDoubleOrNull()
-                            if (amount == null) {
+                            if (amount == null || !amount.isFinite()) {
                                 sender.sendMessage("$prefix§c${loc("commands.points_must_be_number")}")
+                            } else if (amount < 0.0) {
+                                sender.sendMessage("$prefix§c${loc("commands.amount_must_be_positive")}")
                             } else {
-                                val cents = kotlin.math.round(amount * 100.0)
+                                val cents = pointsToCents(amount) ?: run {
+                                    sender.sendMessage("$prefix§c${loc("commands.points_must_be_number")}")
+                                    return true
+                                }
                                 val player = plugin.server.getPlayerExact(target) ?: return false
                                 Points.addPoints(player.uniqueId, cents)
                                 // zh_CN: increase_points_success expects {points} and {target}
-                                sender.sendMessage("$prefix§a${loc("commands.increase_points_success", mapOf("target" to target, "points" to String.format("%.2f", amount)))}")
+                                sender.sendMessage("$prefix§a${loc("commands.increase_points_success", mapOf("target" to target, "points" to String.format(Locale.ROOT, "%.2f", amount)))}")
                             }
                         } else sender.sendMessage("$prefix${loc("commands.usage", mapOf("usage" to "/$label points add <player> <amount>"))}")
                     }
@@ -332,8 +359,8 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                         sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
                         return true
                     }
-                    val stat = PlayerStat(sender.uniqueId)
-                    val missedDays = Checkins.getMissedDays(sender.uniqueId)
+                    val stat = PlayerStat.load(sender.uniqueId)
+                    val missedDays = stat.missedDays
                     val correctionSlips = stat.correctionSlipAmount
                     val usableSlips = missedDays.coerceAtMost(correctionSlips)
                     // zh_CN provides slips_left ({slips}) and usable_slips ({usableSlips})
@@ -353,6 +380,10 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                             if (args.size >= 3) {
                                 val target = args[2]
                                 val amount = if (args.size >= 4) args[3].toIntOrNull() ?: 1 else 1
+                                if (amount <= 0) {
+                                    sender.sendMessage("$prefix§c${loc("commands.amount_must_be_positive")}")
+                                    return true
+                                }
                                 val player = plugin.server.getPlayerExact(target) ?: return false
                                 CorrectionSlips.giveCorrectionSlip(player.uniqueId, amount)
                                 // zh_CN: give_slips_success expects {target} and {amount}
@@ -364,6 +395,10 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                             if (args.size >= 3) {
                                 val target = args[2]
                                 val amount = if (args.size >= 4) args[3].toIntOrNull() ?: 1 else 1
+                                if (amount <= 0) {
+                                    sender.sendMessage("$prefix§c${loc("commands.amount_must_be_positive")}")
+                                    return true
+                                }
                                 val player = plugin.server.getPlayerExact(target) ?: return false
                                 CorrectionSlips.decreaseCorrectionSlip(player.uniqueId, amount)
                                 // zh_CN: decrease_slips_success expects {target} and {amount}
@@ -410,7 +445,12 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                 var force = false
 
                 if (args.size >= 2) {
-                    args[1].toIntOrNull()?.let { cards = if (it > 0) it else 1 }
+                    val parsedCards = args[1].toIntOrNull()
+                    if (parsedCards == null || parsedCards <= 0) {
+                        sender.sendMessage("$prefix§c${loc("commands.amount_must_be_positive")}")
+                        return true
+                    }
+                    cards = parsedCards.coerceAtMost(3_650)
                 }
 
                 if (args.size >= 3) {
@@ -426,23 +466,22 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                     }
                 }
 
-                if (!isAdmin && target != sender.name) {
+                if (!isMakeUpForceAllowed(force, isAdmin)) {
+                    sender.sendMessage("$prefix§c${loc("commands.no_permission")}")
+                    return true
+                }
+
+                if (!isAdmin && !target.equals(sender.name, ignoreCase = true)) {
                     // zh_CN key: can_not_make_up_others
                     sender.sendMessage("$prefix§c${loc("commands.can_not_make_up_others")}")
                     return true
                 }
 
                 val player = plugin.server.getPlayerExact(target) ?: return false
-                val finalForce = force || isAdmin
-                val (madeUpDates, refundedCards) = Checkins.makeUpSign(player.uniqueId, cards, finalForce)
+                val (madeUpDates, unusedCards) = Checkins.makeUpSign(player.uniqueId, cards, force)
 
-                val today = java.time.LocalDate.now()
+                val today = SignInPlus.today()
                 val signedInToday = madeUpDates.contains(today)
-
-                if (signedInToday) {
-                    // Temporarily remove today's sign-in to correctly calculate streak and trigger rewards
-                    Checkins.getSignedDates(player.uniqueId).toMutableList().remove(today)
-                }
 
                 if (madeUpDates.isNotEmpty()) {
                     val pastDaysMadeUp = madeUpDates.filter { it.isBefore(today) }
@@ -451,20 +490,18 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
                         // zh_CN provides make_up_success (with embedded count in original template)
                         sender.sendMessage("$prefix§a${loc("commands.make_up_success", mapOf("amount" to pastDaysMadeUp.size.toString()))}")
 
-                        if (refundedCards > 0) {
-                            // zh_CN uses refund_slip_success with {refundedCards}
-                            sender.sendMessage("$prefix§e${loc("commands.refund_slip_success", mapOf("refundedCards" to refundedCards.toString()))}")
+                        if (unusedCards > 0) {
+                            sender.sendMessage("$prefix§e${loc("commands.unused_make_up_count", mapOf("amount" to unusedCards.toString()))}")
                         }
                     } else if (signedInToday) {
                         // zh_CN: cannot_make_up_today
                         sender.sendMessage("$prefix§a${loc("commands.cannot_make_up_today")}")
                     }
 
-                    plugin.rewardExecutor.onSignedIn(player.uniqueId)
-
                     if (signedInToday) {
-                        // Add today's sign-in back after rewards have been processed
-                        Checkins.getSignedDates(player.uniqueId).toMutableList().add(today)
+                        plugin.rewardExecutor.onSignedIn(player.uniqueId)
+                    } else {
+                        plugin.rewardExecutor.onHistoryChanged(player.uniqueId)
                     }
 
                     val totalDays = Checkins.getSignedDates(player.uniqueId).size
@@ -889,3 +926,6 @@ class SignInPlusCommand(private val plugin: SignInPlus) : CommandExecutor, TabCo
         return out
     }
 }
+
+internal fun isMakeUpForceAllowed(forceRequested: Boolean, isAdmin: Boolean): Boolean =
+    !forceRequested || isAdmin

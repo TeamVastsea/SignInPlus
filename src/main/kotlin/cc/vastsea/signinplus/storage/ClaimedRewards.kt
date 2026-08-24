@@ -3,17 +3,15 @@ package cc.vastsea.signinplus.storage
 import cc.vastsea.signinplus.SignInPlus.Companion.now
 import cc.vastsea.signinplus.SignInPlus.Companion.today
 import org.jetbrains.exposed.sql.Table
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.insertIgnore
 import org.jetbrains.exposed.sql.javatime.datetime
-import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.LocalDateTime
 import java.util.*
 
 /*
 CREATE TABLE IF NOT EXISTS claimed_rewards (
-    player TEXT NOT NULL,
+    player_uuid UUID NOT NULL,
     type TEXT NOT NULL,
     times INTEGER NOT NULL,
     claimed_time INTEGER NOT NULL,
@@ -21,51 +19,32 @@ CREATE TABLE IF NOT EXISTS claimed_rewards (
 );
 */
 object ClaimedRewards : Table() {
-    val player = uuid("player")
+    val player = uuid("player_uuid")
     val type = enumeration("type", ClaimedType::class)
     val times = integer("times")
     val claimedTime = datetime("claimed_time")
 
-    init {
-        uniqueIndex(player, type)
-    }
+    override val primaryKey = PrimaryKey(player, type, times, name = "pk_claimed_rewards")
 
-    fun hasClaimedTotalReward(player: UUID, times: Int): Boolean {
-        return transaction {
-            ClaimedRewards.selectAll().where {
-                (ClaimedRewards.player eq player) and (type eq ClaimedType.TOTAL) and (ClaimedRewards.times eq times)
-            }.count() > 0
-        }
-    }
-
-    fun markClaimedTotalReward(player: UUID, times: Int) {
-        transaction {
-            ClaimedRewards.insert {
+    fun tryClaimTotalReward(player: UUID, times: Int): Boolean {
+        return transaction(DatabaseHelper.database) {
+            ClaimedRewards.insertIgnore {
                 it[ClaimedRewards.player] = player
                 it[type] = ClaimedType.TOTAL
                 it[ClaimedRewards.times] = times
                 it[claimedTime] = LocalDateTime.of(today(), now())
-            }
+            }.insertedCount > 0
         }
     }
 
-    fun hasClaimedStreakReward(player: UUID, times: Int): Boolean {
-        return transaction {
-            ClaimedRewards.selectAll().where {
-                (ClaimedRewards.player eq player) and
-                        (type eq ClaimedType.STREAK) and (ClaimedRewards.times eq times)
-            }.count() > 0
-        }
-    }
-
-    fun markClaimedStreakReward(player: UUID, times: Int) {
-        transaction {
-            ClaimedRewards.insert {
+    fun tryClaimStreakReward(player: UUID, times: Int): Boolean {
+        return transaction(DatabaseHelper.database) {
+            ClaimedRewards.insertIgnore {
                 it[ClaimedRewards.player] = player
                 it[type] = ClaimedType.STREAK
                 it[ClaimedRewards.times] = times
                 it[claimedTime] = LocalDateTime.of(today(), now())
-            }
+            }.insertedCount > 0
         }
     }
 

@@ -4,6 +4,7 @@ import cc.vastsea.signinplus.util.ColorUtil
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
+import java.nio.charset.StandardCharsets
 
 class Localization(private val plugin: JavaPlugin) {
     var locale: String = "en_US"
@@ -15,14 +16,19 @@ class Localization(private val plugin: JavaPlugin) {
         val resourceName = "lang/$newLocale.yml"
         val file = File(folder, "$newLocale.yml")
         if (!file.exists()) plugin.saveResource(resourceName, false)
-        val config = YamlConfiguration.loadConfiguration(file)
         messages.clear()
-        for (key in config.getKeys(true)) {
-            if (config.isString(key)) {
-                val value = config.getString(key) ?: continue
-                // 保留原始内容，转换在 get() 时进行，支持 & 与 § 并存
-                messages[key] = value
+
+        // Load bundled messages first so upgrades can add keys without overwriting administrator edits.
+        plugin.getResource(resourceName)?.reader(StandardCharsets.UTF_8)?.use { reader ->
+            val defaults = YamlConfiguration.loadConfiguration(reader)
+            for (key in defaults.getKeys(true)) {
+                if (defaults.isString(key)) defaults.getString(key)?.let { messages[key] = it }
             }
+        }
+
+        val config = YamlConfiguration.loadConfiguration(file)
+        for (key in config.getKeys(true)) {
+            if (config.isString(key)) config.getString(key)?.let { messages[key] = it }
         }
         locale = newLocale
     }

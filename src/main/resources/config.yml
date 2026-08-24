@@ -11,11 +11,10 @@
 # - Keys: database.type / database.url / database.username / database.password
 # URL Formats
 # - sqlite: signinplus.db
-# - postgresql: 127.0.0.1:5432/signinplus?sslmode=disable
-# - mysql: 127.0.0.1:3306/signinplus
-# Auto-create
-# - sqlite: creates plugins/SignInPlus/signinplus.db if missing
-# - mysql/postgresql: attempts to create database signinplus (account needs create permission)
+# - postgresql: db.example.com:5432/signinplus?sslmode=verify-full
+# - mysql: db.example.com:3306/signinplus?sslMode=VERIFY_IDENTITY
+# The database must already exist. Prefer a least-privilege account limited to that database.
+# Username/password may also be supplied with SIGNINPLUS_DB_USERNAME / SIGNINPLUS_DB_PASSWORD.
 # Examples
 # - postgresql: type=postgresql, url=127.0.0.1:5432/signinplus?sslmode=disable, username=local_pg, password=...
 #########################################################
@@ -24,6 +23,8 @@ database:
   url: signinplus.db
   username:
   password:
+  pool_size: 10
+  connection_timeout_ms: 10000
 
 #########################################################
 # On login action
@@ -37,21 +38,25 @@ on_login_action: none
 # message_prefix: plugin message prefix
 # timezone: see https://www.zeitverschiebung.net/en/all-time-zones.html
 # locale: language (zh_CN / en_US)
-# bState: enable bStats metrics
 # debug: enable debug mode (more logs)
 #########################################################
 message_prefix: "&7[&aSignInPlus&7] "
 timezone: "Asia/Shanghai"
 locale: en_US
-bState: true
 debug: false
+
+# Player identity is always stored by UUID. Enable this behind UniversalAuth/Velocity to reject
+# name-derived offline UUIDs caused by a broken forwarding configuration.
+identity:
+  require_stable_uuid: false
 
 #########################################################
 # Default sign-in rewards
 # Actions supported:
 # - [COMMAND]   Execute command (supports %player_name%)
 # - [SOUND]     Play sound [type volume pitch]
-# - [ITEM]      Give item [item amount NBT]
+# - [ITEM]      Give item [item amount /give data-components]
+#                 Example: diamond_sword 1 [minecraft:enchantments={levels:{"minecraft:sharpness":3}}]
 # - [SLEEP]     Delay (ticks, 20 ticks = 1s)
 # - [EFFECT]    Potion effect [type level seconds]
 # - [MESSAGE]   Send message [message]
@@ -68,64 +73,13 @@ debug: false
 # - [/RANDOM_PICK] End mutually-exclusive random list
 #########################################################
 default:
-  actions:
-    # Basic examples
-    - "[COMMAND] give %player_name% apple 64"
-    - "[SOUND] ENTITY_PLAYER_LEVELUP 0.5 1.0"
-    - "[ITEM] apple 64"
-    - "[BROADCAST] %player_name% §6has signed in today!"
-    - "[TITLE] §cSign-in successful!"
-    - "[SLEEP] 20"
-    - "[EFFECT] speed 2 10"
-
-    # Item NBT
-    # 1. ✅ Normal enchantment: a diamond sword with Unbreaking III
-    - '[ITEM] DIAMOND_SWORD 1 {Enchantments:[{id:"minecraft:unbreaking",lvl:3s}]}'
-    # 2. ✅ Complex NBT (custom name and lore): a special golden apple
-    - '[ITEM] GOLDEN_APPLE 1 {"display":{"Name":"{\"text\":\"Life Golden Apple\",\"color\":\"gold\",\"italic\":false}","Lore":["{\"text\":\"A special apple!\",\"color\":\"yellow\"}"]}}'
-    # 3. ✅ Complex NBT (book): a written book with title, author, and pages
-    - '[ITEM] WRITTEN_BOOK 1 {title:"My Story",author:"Steve",pages:["{\"text\":\"Content of the first page.\"}","{\"text\":\"The second page is even better!\"}"]}'
-    # 4. ⚠️ Invalid NBT: expected result is a normal stone and a console warning
-    # - "[ITEM] STONE 1 {invalid_nbt:true}"  # (Maybe cause error in some server implementations so we comment it out)
-    # 5. ⚠️ Force fix: missing braces are fixed by force=true
-    - '[ITEM] IRON_INGOT 1 "display":{"Name":"{\"text\":\"Force-fixed Iron Ingot\"}"} force=true'
-    # 6. ✅ Empty NBT: gives a normal dirt
-    - "[ITEM] DIRT 1 {}"
-
-    # Points rewards
-    - "[POINTS] 64"
-    - "[POINTS] 64 z"
-    - "[POINTS] 1..5 .2f"
-    - "[POINTS] 1..5 .1f"
-    - "[POINTS] 1..5 .3f"
-    - "[POINTS] 1..5 z"
-
-    # Chance rewards
-    - "[PROB=0.25] [COMMAND] give %player_name% diamond 1"
-
-    # Mutually-exclusive rewards
-    - "[RANDOM_PICK=2]"
-    - "[COMMAND] give %player_name% apple 10"
-    - "[COMMAND] give %player_name% diamond 1"
-    - "[COMMAND] give %player_name% emerald 5"
-    - "[/RANDOM_PICK]"
-
-    # Weighted rewards
-    - "[RANDOM_WEIGHTED]"
-    - "[WEIGHT=60] [COMMAND] give %player_name% apple 10"
-    - "[WEIGHT=30] [COMMAND] give %player_name% diamond 1"
-    - "[WEIGHT=10] [COMMAND] give %player_name% nether_star 1"
-    - "[/RANDOM_WEIGHTED]"
-
-    # Nested examples
-    - "[PROB=0.5] [COMMAND] give %player_name% bread 1"
-    - "[RANDOM_WEIGHTED]"
-    - "[WEIGHT=80] [COMMAND] give %player_name% apple 5"
-    - "[WEIGHT=15] [COMMAND] give %player_name% diamond 1"
-    - "[WEIGHT=5] [COMMAND] give %player_name% netherite_ingot 1"
-    - "[/RANDOM_WEIGHTED]"
-    - "[SLEEP] 20"
-    - "[MESSAGE] Congratulations on signing in!"
+  # Production-safe default: no economy-changing rewards until explicitly configured.
+  actions: []
+  # Examples:
+  # actions:
+  #   - "[COMMAND] give %player_name% apple 1"
+  #   - "[POINTS] 1.00"
+  #   - "[PROB=0.10] [COMMAND] give %player_name% diamond 1"
 
 #########################################################
 # Cumulative and streak rewards
@@ -204,9 +158,9 @@ special_dates:
 
 #########################################################
 # Web API
-# - External sign-in endpoint (WIP)
 # - External query endpoints (status / total / streak etc.)
-# - Protect with firewall or authentication to prevent abuse
+# - Requires a Bearer API key of at least 24 characters
+# - Keep bound to loopback and publish through an HTTPS reverse proxy
 # - enable_web_api: enable Web API
 # - web_api_address: bind address
 # - web_api_port: port
@@ -214,6 +168,8 @@ special_dates:
 #########################################################
 web_api:
   enable_web_api: false
-  web_api_address: 0.0.0.0
+  web_api_address: 127.0.0.1
   web_api_port: 7999
   web_api_endpoint: /api
+  api_key: ""
+  requests_per_minute: 60

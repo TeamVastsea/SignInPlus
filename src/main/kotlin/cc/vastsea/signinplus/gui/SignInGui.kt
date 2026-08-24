@@ -7,12 +7,15 @@ import cc.vastsea.signinplus.storage.PluginMeta
 import dev.triumphteam.gui.builder.item.ItemBuilder
 import dev.triumphteam.gui.guis.Gui
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import java.time.LocalDate
 import java.time.YearMonth
 
 object SignInGui {
+
+    private val legacy = LegacyComponentSerializer.legacySection()
 
     private fun loc(key: String, placeholders: Map<String, String>? = null): String {
         return SignInPlus.localization.get(key, placeholders)
@@ -25,7 +28,7 @@ object SignInGui {
         val title = loc("gui.title", mapOf("year" to yearMonth.year.toString(), "month" to yearMonth.monthValue.toString()))
         
         val gui = Gui.gui()
-            .title(Component.text(title))
+            .title(legacy.deserialize(title))
             .rows(6)
             .disableAllInteractions()
             .create()
@@ -37,17 +40,18 @@ object SignInGui {
         gui.removeItem(44)
         
         // Stats Item (Row 0, Center: Slot 4)
+        val signedDates = Checkins.getSignedDates(player.uniqueId).toSet()
         val streak = Checkins.getStreakDays(player.uniqueId)
-        val total = Checkins.getTotalDays(player.uniqueId)
+        val total = signedDates.size
         val statsName = loc("gui.stats.name")
         val streakStr = loc("gui.stats.streak", mapOf("days" to streak.toString()))
         val totalStr = loc("gui.stats.total", mapOf("days" to total.toString()))
         
         val statsItem = ItemBuilder.from(Material.PAPER)
-            .name(Component.text(statsName))
+            .name(legacy.deserialize(statsName))
             .lore(
-                Component.text(streakStr),
-                Component.text(totalStr)
+                legacy.deserialize(streakStr),
+                legacy.deserialize(totalStr)
             )
             .asGuiItem()
         gui.setItem(4, statsItem)
@@ -58,12 +62,13 @@ object SignInGui {
         // - 30 days for Apr, Jun, Sep, Nov
         // - 28 or 29 days for Feb (Leap year logic)
         val daysInMonth = yearMonth.lengthOfMonth()
-        val signedDates = Checkins.getSignedDates(player.uniqueId).toSet()
-
-        val canMakeUp = player.hasPermission("signinplus.make_up")
+        val canMakeUp = player.hasPermission("signinplus.make_up") || player.hasPermission("signinplus.admin")
         val slips = if (canMakeUp) CorrectionSlips.getCorrectionSlipAmount(player.uniqueId) else 0
         
         val firstLaunchDate = PluginMeta.getFirstLaunchDate()
+        val firstEligibleDate = signedDates.minOrNull()?.let { firstSigned ->
+            firstLaunchDate?.let { maxOf(firstSigned, it) } ?: firstSigned
+        }
 
         // Slots 9 to 9 + daysInMonth - 1
         // Requirement: "从1号开始放在第二行第一个" -> Slot 9 (Row 1, Col 0)
@@ -72,7 +77,7 @@ object SignInGui {
             val isSigned = signedDates.contains(date)
             val isToday = date == today
             val isFuture = date.isAfter(today)
-            val isBeforeLaunch = firstLaunchDate != null && date.isBefore(firstLaunchDate)
+            val isBeforeLaunch = firstEligibleDate == null || date.isBefore(firstEligibleDate)
 
             val material = when {
                 isSigned -> Material.LIME_STAINED_GLASS_PANE
@@ -100,55 +105,34 @@ object SignInGui {
             }
 
             val item = ItemBuilder.from(material)
-                .name(Component.text(dayName))
-                .lore(Component.text(status))
+                .name(legacy.deserialize(dayName))
+                .lore(legacy.deserialize(status))
 
             if (canMakeUpThisDay) {
                 item.lore(
-                    Component.text(status),
-                    Component.text(loc("gui.status.slips", mapOf("amount" to slips.toString())))
+                    legacy.deserialize(status),
+                    legacy.deserialize(loc("gui.status.slips", mapOf("amount" to slips.toString())))
                 )
             }
 
             val guiItem = item.asGuiItem { _ ->
-                    if (isToday && !isSigned) {
-                        // 直接调用签到逻辑，不通过 performCommand
-                        Checkins.signInToday(player.uniqueId)
-                        SignInPlus.instance.rewardExecutor.onSignedIn(player.uniqueId)
-                        player.sendMessage(SignInPlus.localization.get("commands.sign_in_success"))
+                    val canSignNow = player.hasPermission("signinplus.user") || player.hasPermission("signinplus.admin")
+                    val canMakeUpNow = player.hasPermission("signinplus.make_up") || player.hasPermission("signinplus.admin")
+                    if (isToday && !isSigned && canSignNow) {
+                        if (Checkins.signInToday(player.uniqueId)) {
+                            SignInPlus.instance.rewardExecutor.onSignedIn(player.uniqueId)
+                            player.sendMessage(SignInPlus.localization.get("commands.sign_in_success"))
+                        } else {
+                            player.sendMessage(SignInPlus.localization.get("commands.already_signed_in"))
+                        }
                         
                         // Refresh GUI after action
                         SignInPlus.instance.server.scheduler.runTask(SignInPlus.instance, Runnable {
                             open(player, yearMonth)
                         })
                     } else if (canMakeUpThisDay) {
-                         // Perform make up for SPECIFIC DATE
-                         // Command: /signinplus make_up <cards> <player> <force>
-                         // But standard command only makes up the LAST missed day.
-                         // We need a way to make up a SPECIFIC date.
-                         // Standard logic: Checkins.makeUpSign(...) finds missed days from today backwards.
-                         // If we want to support specific day make up, we need to extend Checkins or add a new command parameter/logic.
-                         // Or we can manually insert the record if we are sure (but Checkins.makeUpSign handles logic).
-                         
-                         // The user said: "我点哪天补签到哪天" (Click which day to make up that day).
-                         // We need to implement a new method in Checkins or use a new command.
-                         // Let's implement a new method in Checkins to sign a specific past date if valid.
-                         // And probably a new command argument or just internal call if possible (but GUI calls command usually for permission/consistency).
-                         // Since we are in the same plugin, we can call Checkins/CorrectionSlips directly if we handle permissions here.
-                         
-                         // Logic:
-                         // 1. Check if player has slips (or is admin/force).
-                         // 2. Consume 1 slip.
-                         // 3. Sign that specific date.
-                         // 4. Refund if failed?
-                         
-                         if (slips > 0) {
-                             // Use internal logic directly for specific date
-                             // Deduct slip
-                             CorrectionSlips.decreaseCorrectionSlip(player.uniqueId, 1)
-                             // Sign date
-                             Checkins.forceSignDate(player.uniqueId, date)
-                             // Refresh
+                         if (canMakeUpNow && Checkins.makeUpDate(player.uniqueId, date)) {
+                             SignInPlus.instance.rewardExecutor.onHistoryChanged(player.uniqueId)
                              SignInPlus.instance.server.scheduler.runTask(SignInPlus.instance, Runnable {
                                  open(player, yearMonth)
                              })
@@ -169,24 +153,26 @@ object SignInGui {
         // Navigation Buttons (Row 5: 45-53)
         
         // Previous Month (Slot 45 - Bottom Left)
-        val prevItem = ItemBuilder.from(Material.ARROW)
-            .name(Component.text(loc("gui.buttons.previous")))
-            .asGuiItem {
-                open(player, yearMonth.minusMonths(1))
-            }
-        gui.setItem(45, prevItem)
+        val earliestMonth = firstEligibleDate?.let(YearMonth::from) ?: YearMonth.from(today)
+        if (yearMonth.isAfter(earliestMonth)) {
+            val prevItem = ItemBuilder.from(Material.ARROW)
+                .name(legacy.deserialize(loc("gui.buttons.previous")))
+                .asGuiItem { open(player, yearMonth.minusMonths(1)) }
+            gui.setItem(45, prevItem)
+        }
 
         // Next Month (Slot 53 - Bottom Right)
-        val nextItem = ItemBuilder.from(Material.ARROW)
-            .name(Component.text(loc("gui.buttons.next")))
-            .asGuiItem {
-                open(player, yearMonth.plusMonths(1))
-            }
-        gui.setItem(53, nextItem)
+        val currentMonth = YearMonth.from(today)
+        if (yearMonth.isBefore(currentMonth)) {
+            val nextItem = ItemBuilder.from(Material.ARROW)
+                .name(legacy.deserialize(loc("gui.buttons.next")))
+                .asGuiItem { open(player, yearMonth.plusMonths(1)) }
+            gui.setItem(53, nextItem)
+        }
 
         // Close Button (Slot 49 - Bottom Center)
         val closeItem = ItemBuilder.from(Material.BARRIER)
-            .name(Component.text(loc("gui.buttons.close")))
+            .name(legacy.deserialize(loc("gui.buttons.close")))
             .asGuiItem {
                 gui.close(player)
             }

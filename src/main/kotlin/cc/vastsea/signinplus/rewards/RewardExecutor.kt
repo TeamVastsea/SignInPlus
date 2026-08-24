@@ -28,7 +28,24 @@ class RewardExecutor(private val plugin: SignInPlus) {
         // 默认奖励
         runActionsFromConfig("default.actions", player)
 
-        // 累计奖励
+        runHistoryRewards(player)
+
+        // 排行奖励
+        val rankStr = Checkins.getRankToday(player)
+        val rank = rankStr.toIntOrNull()
+        if (rank != null) {
+            runTopRewards(rank, player)
+        }
+
+        runCurrentSpecialDateRewards(player)
+    }
+
+    fun onHistoryChanged(player: UUID) {
+        logDebug("Processing corrected sign-in history for player: ${playerLabel(player)}")
+        runHistoryRewards(player)
+    }
+
+    private fun runHistoryRewards(player: UUID) {
         Checkins.getSignedDates(player).let { signedDates ->
             val total = signedDates.size
             runCumulativeRewards(total, player)
@@ -38,14 +55,9 @@ class RewardExecutor(private val plugin: SignInPlus) {
             runStreakRewards(streak, player)
         }
 
-        // 排行奖励
-        val rankStr = Checkins.getRankToday(player)
-        val rank = rankStr.toIntOrNull()
-        if (rank != null) {
-            runTopRewards(rank, player)
-        }
+    }
 
-        // 特殊日期奖励
+    private fun runCurrentSpecialDateRewards(player: UUID) {
         val specials = plugin.config.getMapList("special_dates")
         val zone = java.time.ZoneId.of(plugin.config.getString("timezone") ?: "Asia/Shanghai")
         val now = java.time.LocalDate.now(zone)
@@ -72,7 +84,7 @@ class RewardExecutor(private val plugin: SignInPlus) {
                 // 每年的某一天: *-MM-dd
                 isYearly -> date.substring(2) == now.format(mdFmt)
                 // 每月的某一天: *-*-dd
-                isMonthly -> date.substring(4) == String.format("%02d", now.dayOfMonth)
+                isMonthly -> date.substring(4) == String.format(Locale.ROOT, "%02d", now.dayOfMonth)
                 // 星期几: Monday..Sunday (大小写不敏感)
                 isWeekday -> dow.equals(date.uppercase(), true)
                 // 精确日期 yyyy-MM-dd
@@ -84,21 +96,19 @@ class RewardExecutor(private val plugin: SignInPlus) {
 
             if (!isExact) {
                 val limit = if (repeatEnabled) repeatTime.coerceAtLeast(1) else 1
-                val currentTimes = SpecialDateClaims.getTimes(player, date)
-                if (currentTimes >= limit) {
-                    logDebug("Special date '&a$date&r' reached limit for ${playerLabel(player)} (&c$currentTimes/$limit&r), skipping.")
+                val claimedTimes = SpecialDateClaims.tryClaim(player, date, limit)
+                if (claimedTimes == null) {
+                    logDebug("Special date '&a$date&r' reached limit for ${playerLabel(player)}, skipping.")
                     continue
                 }
-                // 允许一次领取，并累计次数
                 logDebug(
-                    "Granting special date '&a$date&r' to ${playerLabel(player)} (count &a${currentTimes + 1}/$limit&r). Actions: &c${
+                    "Granting special date '&a$date&r' to ${playerLabel(player)} (count &a$claimedTimes/$limit&r). Actions: &c${
                         actions.joinToString(
                             ", "
                         )
                     }"
                 )
                 runActionLines(actions, player)
-                SpecialDateClaims.increment(player, date)
             } else {
                 // 精确日期仅当天一次，不需要次数限制
                 logDebug(
@@ -128,13 +138,10 @@ class RewardExecutor(private val plugin: SignInPlus) {
         val eligible = list.filter { it.containsKey("times") }
             .mapNotNull { m ->
                 val threshold = m["times"] as? Int ?: return@mapNotNull null
-                if (totalDays >= threshold && !ClaimedRewards.hasClaimedTotalReward(
-                        player,
-                        threshold
-                    )
-                ) threshold to m else null
+                if (totalDays >= threshold) threshold to m else null
             }
         eligible.forEach { (threshold, rewardMap) ->
+            if (!force && !ClaimedRewards.tryClaimTotalReward(player, threshold)) return@forEach
             val actions = (rewardMap["actions"] as? List<*>) ?: emptyList<Any>()
             logDebug(
                 "Granting cumulative reward for &a$threshold &rdays to ${playerLabel(player)}. Actions: &c${
@@ -144,9 +151,6 @@ class RewardExecutor(private val plugin: SignInPlus) {
                 }"
             )
             runActionLines(actions, player)
-            if (!force) {
-                ClaimedRewards.markClaimedTotalReward(player, threshold)
-            }
         }
     }
 
@@ -178,13 +182,10 @@ class RewardExecutor(private val plugin: SignInPlus) {
         val eligible = list.filter { it.containsKey("times") }
             .mapNotNull { m ->
                 val threshold = m["times"] as? Int ?: return@mapNotNull null
-                if (streakDays >= threshold && !ClaimedRewards.hasClaimedStreakReward(
-                        player,
-                        threshold
-                    )
-                ) threshold to m else null
+                if (streakDays >= threshold) threshold to m else null
             }
         eligible.forEach { (threshold, rewardMap) ->
+            if (!force && !ClaimedRewards.tryClaimStreakReward(player, threshold)) return@forEach
             val actions = (rewardMap["actions"] as? List<*>) ?: emptyList<Any>()
             logDebug(
                 "Granting streak reward for &a$threshold &rdays to ${playerLabel(player)}. Actions: &c${
@@ -194,9 +195,6 @@ class RewardExecutor(private val plugin: SignInPlus) {
                 }"
             )
             runActionLines(actions, player)
-            if (!force) {
-                ClaimedRewards.markClaimedStreakReward(player, threshold)
-            }
         }
     }
 
